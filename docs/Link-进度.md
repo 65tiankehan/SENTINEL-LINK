@@ -86,3 +86,46 @@ dotnet bin\Release\net10.0\SyntheticPeer.dll --hub http://127.0.0.1:5180 --serve
 
 # 3) 真 SPT 服务端：把 config.json 的 enabled 改 true、hubUrl 指向 Hub，正常启动 SPT.Server.exe
 ```
+
+---
+
+## P1 第 1 步 · 客户端世界聊天面板（2026-11-20）
+
+**做了什么**
+
+| 项 | 内容 |
+|---|---|
+| 新工程 | `Client\SENTINEL.Link.Client.csproj`（net48 BepInEx 插件，`AssemblyName=SENTINEL.Link.Client`） |
+| 入口 | `Client\Plugin.cs`：`[BepInPlugin("cn.passionyang.sentinellink.client","SENTINEL Link","0.1.0")]` + `[BepInProcess("EscapeFromTarkov.exe")]`，热键 **F10**（F7 是 Min、F9 是完整版菜单） |
+| 宿主 | `Client\UI\LinkChatBehaviour.cs`：DontDestroyOnLoad 的 GameObject，Update 处理键位、OnGUI 交给面板 |
+| 面板 | `Client\UI\LinkChatPanel.cs`：右侧 436 宽卡片，头部状态胶囊 + realm/对端数，中部消息流（滚轮翻历史），底部输入框 + 发送，页脚提示 |
+| 数据 | `Client\Core\LinkApi.cs`：`SPT.Common.Http.RequestHandler.PostJsonAsync` → `/sentinelink/client/chat/state`、`/chat/send`；后台线程轮询 2 s，结果加锁合并，OnGUI 里绝不 await |
+| 模型 | `Client\Models\LinkClientModels.cs`：`LinkChatSnapshot / LinkPeer / LinkMessage / LinkSendResult`（Newtonsoft） |
+| 复用 | `..\..\SENTINEL-Min\UI\MinDraw.cs`、`MinTheme.cs` 以 `<Compile Include>` 链接进本工程 —— 圆角/字号/配色与 Min 面板同一套，不复制副本 |
+
+**构建与部署**
+
+- `dotnet build .\Client\SENTINEL.Link.Client.csproj -c Release -p:SptClientDir=E:\EFT --no-incremental` → **0 警告 0 错误**
+- `SENTINEL.Link.Client.dll` **29,184 B**，sha8 **4BF883FB**，FileVersion `0.1.0.0`（版本号从 `Shared\BuildInfo.cs` 读，不在 csproj 写第二份）
+- 已部署两个实例：`E:\EFT\BepInEx\plugins\SENTINEL.Link\` 与 `E:\EFT-Fika\BepInEx\plugins\SENTINEL.Link\`（sha8 一致）
+
+**属性自检（Cecil 直读成品 dll）**
+
+- `[BepInPlugin("cn.passionyang.sentinellink.client", "SENTINEL Link", "0.1.0")]` ✔
+- `[BepInProcess("EscapeFromTarkov.exe")]` ✔
+- 类型：`Plugin / LinkChatBehaviour / LinkChatPanel / LinkApi / MinDraw / MinTheme / BuildInfo / 4 个 DTO`
+
+**怎么试**
+
+1. 起 Hub：`cd Hub; $env:SENTINEL_HUB_PORT="5180"; dotnet run -c Release --no-build`
+2. 起 SPT 服务端 + 启动器，进主菜单
+3. 游戏里按 **F10**：面板应从右侧滑出，头部胶囊显示「已连接 Hub」；若显示「未连接」，先看 `BepInEx\LogOutput.log` 有无 `[Link] state 拉取失败`
+4. 用假对端发一条：`SyntheticPeer --hub http://127.0.0.1:5180 --server-id peer-b --nickname 路人B --chat "面板收到吗"` → 面板 2 s 内出现「路人B：面板收到吗」
+5. 面板里输入文字回车 → 假对端（带 `--listen 8`）应打印 `chat` 帧；发送方自己收到的是 `ack`，不重复显示
+
+**已知限制（P1 有意不做）**
+
+- 输入框是 IMGUI `TextField`：中文在游戏内需要输入法接管，可能吞字；P2 换 TMP/系统输入框或快捷键预设消息。
+- 面板打开时游戏仍响应鼠标/键盘（没有拦输入），会误触开火 —— P2 加「打开时锁输入」。
+- 消息只有 `at/from/nickname/text`，没有频道概念（世界/好友/队伍），频道在 P2。
+- 未读提示、@提及、表情、本地历史落盘都没有。

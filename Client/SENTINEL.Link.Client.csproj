@@ -1,0 +1,69 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net48</TargetFramework>
+    <LangVersion>latest</LangVersion>
+    <Nullable>disable</Nullable>
+    <AssemblyName>SENTINEL.Link.Client</AssemblyName>
+    <RootNamespace>SentinelLink.Client</RootNamespace>
+    <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
+    <OutputPath>bin\Release\</OutputPath>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+    <SptClientDir Condition="'$(SptClientDir)' == ''">E:\EFT</SptClientDir>
+    <!-- 版本号单一真相源：从 Shared\BuildInfo.cs 读，不在 csproj 里写第二份字面量 -->
+    <LinkVersion>$([System.Text.RegularExpressions.Regex]::Match($([System.IO.File]::ReadAllText('$(MSBuildProjectDirectory)\..\Shared\BuildInfo.cs')), 'const string Version\s*=\s*"([0-9]+\.[0-9]+\.[0-9]+)"').Groups[1].Value)</LinkVersion>
+    <Version>$(LinkVersion)</Version>
+    <AssemblyVersion>$(LinkVersion).0</AssemblyVersion>
+    <FileVersion>$(LinkVersion).0</FileVersion>
+    <IncludeSourceRevisionInInformationalVersion>false</IncludeSourceRevisionInInformationalVersion>
+    <!-- CS0649：Min 的 MinDraw 里 ViewOrigin/ViewScroll 只有面板层用，链接进来后在本工程内无人赋值。 -->
+    <NoWarn>$(NoWarn);CS0649</NoWarn>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Reference Include="BepInEx">
+      <HintPath>$(SptClientDir)\BepInEx\core\BepInEx.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="spt-common">
+      <HintPath>$(SptClientDir)\BepInEx\plugins\spt\spt-common.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="Newtonsoft.Json">
+      <HintPath>$(SptClientDir)\EscapeFromTarkov_Data\Managed\Newtonsoft.Json.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="UnityEngine">
+      <HintPath>$(SptClientDir)\EscapeFromTarkov_Data\Managed\UnityEngine.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="UnityEngine.CoreModule">
+      <HintPath>$(SptClientDir)\EscapeFromTarkov_Data\Managed\UnityEngine.CoreModule.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="UnityEngine.IMGUIModule">
+      <HintPath>$(SptClientDir)\EscapeFromTarkov_Data\Managed\UnityEngine.IMGUIModule.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="UnityEngine.TextRenderingModule">
+      <HintPath>$(SptClientDir)\EscapeFromTarkov_Data\Managed\UnityEngine.TextRenderingModule.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="UnityEngine.InputLegacyModule">
+      <HintPath>$(SptClientDir)\EscapeFromTarkov_Data\Managed\UnityEngine.InputLegacyModule.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+  </ItemGroup>
+
+  <ItemGroup>
+    <Compile Include="Plugin.cs" />
+    <Compile Include="Core\**\*.cs" />
+    <Compile Include="Models\**\*.cs" />
+    <Compile Include="UI\**\*.cs" />
+    <Compile Include="..\Shared\BuildInfo.cs" Link="Shared\BuildInfo.cs" />
+    <!-- UI 复用 Min 的绘制层：同一份代码，避免两套圆角/字号各走一路 -->
+    <Compile Include="..\..\SENTINEL-Min\UI\MinDraw.cs" Link="UI\Shared\MinDraw.cs" />
+    <Compile Include="..\..\SENTINEL-Min\UI\MinTheme.cs" Link="UI\Shared\MinTheme.cs" />
+  </ItemGroup>
+
+</Project>
