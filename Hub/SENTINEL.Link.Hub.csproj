@@ -1,0 +1,20 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <AssemblyName>SENTINEL.Link.Hub</AssemblyName>
+    <RootNamespace>SentinelLink.Hub</RootNamespace>
+    <InvariantGlobalization>false</InvariantGlobalization>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Include="Program.cs" />
+    <Compile Include="Services\PeerRegistry.cs" />
+    <Compile Include="Services\HubOptions.cs" />
+    <Compile Include="..\Shared\BuildInfo.cs" Link="Shared\BuildInfo.cs" />
+  </ItemGroup>
+
+</Project>

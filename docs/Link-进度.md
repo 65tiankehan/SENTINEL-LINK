@@ -33,3 +33,56 @@
 - 服务端 `LinkHubClient` 出站握手与 20 s 心跳。
 - 客户端插件（P1 才进厂）。
 - 未部署到 `E:\EFT`（P0 第 2 步和 Hub 一起上）。
+
+## 2026-11-20 · P0 第 2 步：Hub 上线 + 服务端接入 + 四跳跑通
+
+**做了什么**
+
+1. Hub 落地 `Hub\`：`SENTINEL.Link.Hub.csproj`（`Microsoft.NET.Sdk.Web`、net10.0）+ `Program.cs`（281 行）+ `Services\HubOptions.cs`（40 行）+ `Services\PeerRegistry.cs`（279 行）。
+   - 三个端点：`GET /v1/health`、`POST /v1/hello`（邀请码准入 → 发 token）、`GET /v1/ws?token=`（长连）。
+   - 帧协议：`welcome` / `presence` / `chat` / `ack` / `ping`→`pong`。聊天**不回声给发送方**，改回 `ack`（发送方的界面自己已经画过这条）。
+   - 心跳：45 s 无帧判掉线，每 10 s 清扫一次并广播 `presence online=false`；单 realm 上限 64。
+2. 服务端接入 `Server\Services\LinkHubClient.cs`（395 行）：读 mod 目录下 `config.json` → `/v1/hello` → `/v1/ws` → 收帧写进 `LinkState`；断线退避 2→4→8…→30 s 重连。
+   - `serverid.txt` 存盘，跨重启保持同一个 serverId（否则 Hub 上会堆幽灵对端）。
+3. 新路由两条：`/sentinelink/client/chat/send`（发一条）、`/sentinelink/client/chat/state`（拉 `sinceMs` 之后的增量 + 在线列表）；`LinkState` 存 100 条聊天环形缓冲。
+4. `Tools\SyntheticPeer\`（179 行）：假对端，没有第二台机器时冒充「另一个玩家的 SPT 服务端」——hello / ws / 发一条 / 收帧打印。
+
+**踩到的坑（4.1.6 的 DI 默认生命周期不是单例）**
+
+- `[Injectable]` 默认是 **Transient**（Cecil 读 `SPTarkov.DI.dll` 确认 `InjectionType` 有 HostedService/Singleton/Transient/Scoped，特性上还有 `TypePriority`）。`LinkState` 与 `LinkHubClient` 各拿到一份状态，结果 hello 发出去 `serverId` 是空串 → Hub 400「serverId 不能为空」，而开机横幅明明打印了 serverId。
+- 修法：`LinkState`、`LinkHubClient` 都显式写 `[Injectable(InjectionType.Singleton)]`。
+- 另外 `lastSeenMs` 一开始算成 `TimeSpan.FromTicks(ticks).TotalMilliseconds`（约 6.4e13），改成 `(ticks - DateTime.UnixEpoch.Ticks) / TicksPerMillisecond` 才是 Unix 毫秒。
+
+**实测（全部本机）**
+
+| 项 | 值 |
+|---|---|
+| Hub 构建 | `dotnet build -c Release` → **0 个警告 0 个错误**；`SENTINEL.Link.Hub.dll` **45,568 B**，sha8 **F0455F1A** |
+| 服务端构建 | `-p:SptPath=E:\EFT\SPT_Runtime` → **0 个警告 0 个错误**；`SENTINEL.Link.Server.dll` **54,272 B**，sha8 **574CABDA**（已部署到 `E:\EFT\SPT_Runtime\user\mods\cn.passionyang.sentinellink.server\`） |
+| 假对端构建 | **0 个警告 0 个错误**；`SyntheticPeer.dll` **16,896 B**，sha8 **C76DF1E1** |
+| Hub 健康 | `GET /v1/health` → `{"ok":true,"product":"SENTINEL Link","version":"0.1.0","sptVersion":"4.1.6","peers":1,"realms":["default"]}` |
+| 假对端互转 | peer-a 收到 peer-b 的 `presence online=true` → `chat`（中文原样，不转义）→ peer-b 收到 `ack`；peer-a 退出后 peer-b 收到 `presence online=false` |
+| 真服务端接入 | 开机日志 `[SENTINEL Link] 已连上 Hub http://127.0.0.1:5180（realm=default）` |
+| 四跳 | 假对端 peer-c 发「四跳测试：我从假对端发一句话」→ Hub → 真 SPT 服务端日志打出 `[SENTINEL Link] 世界聊天 路人C: 四跳测试：我从假对端发一句话` |
+| 路由注册 | `POST /sentinelink/client/chat/send` 与 `/chat/state` 返回 **200**，未注册路径返回 **404** |
+
+**没做 / 下一步**
+
+- `chat/send`、`chat/state` 目前**没有带 session 的完整回包验证**：SPT 4.1.6 开了 Web 认证，未登录调用返回 200 但空体（同样的空体在已上线的 SkyShieldTrainer 路由上也能复现，属认证层而不是我们的实现）。P1 客户端面板上线后走登录态一起验。
+- P1：客户端 BepInEx 插件 + 世界聊天面板（复用 Min 的 `MinDraw` / `MinTheme`）。
+- Hub 部署形态（单文件自托管 + 反向代理）与邀请码生成器，放到 P2 开头。
+
+**怎么跑（本机）**
+
+```powershell
+# 1) Hub
+cd D:\sptEdior\SENTINELLink\Hub
+$env:SENTINEL_HUB_PORT="5180"; $env:SENTINEL_HUB_KEY="dev-local"
+dotnet run -c Release --no-build
+
+# 2) 假对端（另开一个窗口）
+cd D:\sptEdior\SENTINELLink\Tools\SyntheticPeer
+dotnet bin\Release\net10.0\SyntheticPeer.dll --hub http://127.0.0.1:5180 --server-id peer-b --nickname 路人B --chat "hello" --listen 5
+
+# 3) 真 SPT 服务端：把 config.json 的 enabled 改 true、hubUrl 指向 Hub，正常启动 SPT.Server.exe
+```
