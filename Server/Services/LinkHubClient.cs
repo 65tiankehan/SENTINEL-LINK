@@ -243,6 +243,32 @@ public sealed class LinkHubClient : IDisposable
                     _logger.Info($"[SENTINEL Link] 世界聊天 {message.Nickname}: {message.Text}");
                     break;
 
+                case "dm":
+                    LinkDirectMessage direct = new()
+                    {
+                        Id = Str(root, "id"),
+                        From = Str(root, "from"),
+                        FromNick = Str(root, "fromNick"),
+                        To = Str(root, "to"),
+                        Text = Str(root, "text"),
+                        At = Long(root, "at"),
+                        Replayed = root.TryGetProperty("replayed", out JsonElement replayed) &&
+                                   replayed.ValueKind == JsonValueKind.True
+                    };
+                    _state.AddDirect(direct);
+                    _logger.Info($"[SENTINEL Link] 私聊 {direct.FromNick}: {direct.Text}"
+                                 + (direct.Replayed ? "（离线补投）" : ""));
+                    break;
+
+                case "dm-sync":
+                    int batch = root.TryGetProperty("count", out JsonElement batchElement) &&
+                                batchElement.TryGetInt32(out int parsedBatch)
+                        ? parsedBatch
+                        : 0;
+                    _state.AddSyncBatch(batch);
+                    _logger.Info($"[SENTINEL Link] 离线私聊补投 {batch} 条");
+                    break;
+
                 case "ack":
                 case "pong":
                     break;
@@ -290,6 +316,33 @@ public sealed class LinkHubClient : IDisposable
         }
 
         byte[] payload = JsonSerializer.SerializeToUtf8Bytes(new { type = "chat", text }, Json);
+        await _sendLock.WaitAsync(token).ConfigureAwait(false);
+        try
+        {
+            await socket.SendAsync(payload, WebSocketMessageType.Text, true, token).ConfigureAwait(false);
+            return true;
+        }
+        catch (Exception ex)
+        {
+            _state.LastError = ex.Message;
+            return false;
+        }
+        finally
+        {
+            _sendLock.Release();
+        }
+    }
+
+    /// <summary>发一条私聊。对方离线时 Hub 会落盘排队，下次连上补投。</summary>
+    public async Task<bool> SendDirectAsync(string to, string text, CancellationToken token)
+    {
+        ClientWebSocket? socket = _socket;
+        if (socket is not { State: WebSocketState.Open })
+        {
+            return false;
+        }
+
+        byte[] payload = JsonSerializer.SerializeToUtf8Bytes(new { type = "dm", to, text }, Json);
         await _sendLock.WaitAsync(token).ConfigureAwait(false);
         try
         {

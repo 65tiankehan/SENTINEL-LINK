@@ -147,3 +147,94 @@ public sealed record LinkChatStateResponse
     [JsonPropertyName("serverTime")]
     public long ServerTime { get; init; }
 }
+
+/// <summary>一条私聊（P2）。Replayed=true 表示这是离线补投，不是实时送达。</summary>
+public sealed record LinkDirectMessage
+{
+    [JsonPropertyName("id")]
+    public string Id { get; init; } = "";
+
+    [JsonPropertyName("from")]
+    public string From { get; init; } = "";
+
+    [JsonPropertyName("fromNick")]
+    public string FromNick { get; init; } = "";
+
+    [JsonPropertyName("to")]
+    public string To { get; init; } = "";
+
+    [JsonPropertyName("text")]
+    public string Text { get; init; } = "";
+
+    [JsonPropertyName("at")]
+    public long At { get; init; }
+
+    [JsonPropertyName("replayed")]
+    public bool Replayed { get; init; }
+}
+
+/// <summary>客户端 → 服务端：发一条私聊。</summary>
+public sealed record LinkDirectSendRequest : SPTarkov.Server.Core.Models.Utils.IRequestData
+{
+    [JsonPropertyName("to")]
+    public string? To { get; init; }
+
+    [JsonPropertyName("text")]
+    public string? Text { get; init; }
+}
+
+/// <summary>服务端 → 客户端：私聊发送结果（delivered=false 时 queued=true 表示已排队等对方上线）。</summary>
+public sealed record LinkDirectSendResponse
+{
+    [JsonPropertyName("ok")]
+    public bool Ok { get; init; }
+
+    [JsonPropertyName("delivered")]
+    public bool Delivered { get; init; }
+
+    [JsonPropertyName("queued")]
+    public bool Queued { get; init; }
+
+    [JsonPropertyName("pending")]
+    public int Pending { get; init; }
+
+    [JsonPropertyName("hubState")]
+    public string HubState { get; init; } = "";
+
+    [JsonPropertyName("error")]
+    public string Error { get; init; } = "";
+}
+
+/// <summary>客户端 → 服务端：拉私聊增量（sinceMs 之后）。</summary>
+public sealed record LinkDirectStateRequest : SPTarkov.Server.Core.Models.Utils.IRequestData
+{
+    [JsonPropertyName("sinceMs")]
+    public long SinceMs { get; init; }
+
+    /// <summary>true 时顺手把未读清零（面板打开即已读）。</summary>
+    [JsonPropertyName("markRead")]
+    public bool MarkRead { get; init; }
+}
+
+/// <summary>服务端 → 客户端：私聊消息 + 未读计数。</summary>
+public sealed record LinkDirectStateResponse
+{
+    [JsonPropertyName("hubState")]
+    public string HubState { get; init; } = "";
+
+    [JsonPropertyName("serverId")]
+    public string ServerId { get; init; } = "";
+
+    [JsonPropertyName("messages")]
+    public List<LinkDirectMessage> Messages { get; init; } = new();
+
+    [JsonPropertyName("unread")]
+    public int Unread { get; init; }
+
+    /// <summary>离线补投过的批次数（Hub 连上时告诉我们的），诊断用。</summary>
+    [JsonPropertyName("syncBatches")]
+    public int SyncBatches { get; init; }
+
+    [JsonPropertyName("serverTime")]
+    public long ServerTime { get; init; }
+}

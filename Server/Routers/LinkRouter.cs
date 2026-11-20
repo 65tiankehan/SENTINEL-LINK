@@ -32,6 +32,16 @@ public sealed class LinkRouter(
                 "/sentinelink/client/chat/state",
                 async (url, request, sessionId, output, cancellationToken) =>
                     await callbacks.ChatState(url, request, sessionId)),
+
+            new RouteAction<LinkDirectSendRequest>(
+                "/sentinelink/client/dm/send",
+                async (url, request, sessionId, output, cancellationToken) =>
+                    await callbacks.SendDirect(url, request, sessionId)),
+
+            new RouteAction<LinkDirectStateRequest>(
+                "/sentinelink/client/dm/state",
+                async (url, request, sessionId, output, cancellationToken) =>
+                    await callbacks.DirectState(url, request, sessionId)),
         ])
 {
 }

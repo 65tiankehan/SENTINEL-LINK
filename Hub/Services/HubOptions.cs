@@ -31,6 +31,23 @@ namespace SentinelLink.Hub.Services
         /// <summary>单条聊天文本上限（字符）。</summary>
         public int MaxChatLength { get; init; } = 512;
 
+        /// <summary>私聊单条文本上限（字符），和聊天的 512 分开——私聊更长一点。</summary>
+        public int MaxDirectLength { get; init; } = 1024;
+
+        /// <summary>每个收件人的离线私聊队列上限，超了丢最旧的。</summary>
+        public int DirectQueueLimit { get; init; } = ReadInt("SENTINEL_HUB_DM_LIMIT", 500);
+
+        /// <summary>离线私聊保留时长，过期的在投递时丢掉。</summary>
+        public TimeSpan DirectTtl { get; init; } = TimeSpan.FromHours(168);
+
+        /// <summary>
+        /// 离线私聊的落盘目录。Hub 自己不存业务数据，但「离线消息不丢」这条承诺
+        /// 必须活过 Hub 重启，所以队列单独写文件，重连时读走即删。
+        /// </summary>
+        public string SpoolDirectory { get; init; } =
+            Environment.GetEnvironmentVariable("SENTINEL_HUB_SPOOL")
+            ?? System.IO.Path.Combine(AppContext.BaseDirectory, "spool");
+
         private static int ReadInt(string name, int fallback)
         {
             string? raw = Environment.GetEnvironmentVariable(name);

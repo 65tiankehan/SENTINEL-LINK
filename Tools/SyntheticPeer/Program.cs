@@ -21,8 +21,15 @@ string nickname = Arg("nickname", serverId);
 string inviteKey = Arg("key", "dev-local");
 string realm = Arg("realm", "default");
 string chat = Arg("chat", string.Empty);
+string to = Arg("to", string.Empty);
+int count = int.TryParse(Arg("count", "1"), out int parsedCount) && parsedCount > 0 ? parsedCount : 1;
+int delayMs = int.TryParse(Arg("delay", "20"), out int parsedDelay) && parsedDelay >= 0 ? parsedDelay : 20;
+int expect = int.TryParse(Arg("expect", "0"), out int parsedExpect) ? parsedExpect : 0;
 double listenSeconds = double.TryParse(Arg("listen", "6"), out double parsed) ? parsed : 6;
 bool quiet = opts.ContainsKey("quiet");
+
+int directReceived = 0;
+int directSync = 0;
 
 using HttpClient http = new() { BaseAddress = new Uri(hub) };
 
@@ -102,6 +109,17 @@ Task receiver = Task.Run(async () =>
             }
 
             string text = Encoding.UTF8.GetString(buffer, 0, result.Count);
+
+            // 私聊帧单独数：验收「离线补投 0 丢失」靠这个计数对账
+            if (text.Contains("\"type\":\"dm\"", StringComparison.Ordinal))
+            {
+                Interlocked.Increment(ref directReceived);
+            }
+            else if (text.Contains("\"type\":\"dm-sync\"", StringComparison.Ordinal))
+            {
+                Interlocked.Increment(ref directSync);
+            }
+
             if (!quiet)
             {
                 Console.WriteLine($"[{serverId}] ← {Shorten(text)}");
@@ -129,6 +147,26 @@ if (!string.IsNullOrWhiteSpace(chat))
     Console.WriteLine($"[{serverId}] → chat: {chat}");
 }
 
+if (!string.IsNullOrWhiteSpace(to))
+{
+    for (int i = 1; i <= count; i++)
+    {
+        string text = count == 1 ? (chat.Length > 0 ? chat : $"私聊 #{i}") : $"私聊 #{i}/{count}";
+        string frame = JsonSerializer.Serialize(new { type = "dm", to, text });
+        await socket.SendAsync(Encoding.UTF8.GetBytes(frame), WebSocketMessageType.Text, true, CancellationToken.None);
+
+        if (!quiet)
+        {
+            Console.WriteLine($"[{serverId}] → dm[{i}/{count}] → {to}: {text}");
+        }
+
+        if (delayMs > 0 && i < count)
+        {
+            await Task.Delay(delayMs);
+        }
+    }
+}
+
 await Task.WhenAny(receiver, Task.Delay(TimeSpan.FromSeconds(listenSeconds)));
 
 try
@@ -144,6 +182,18 @@ catch
 }
 
 cts.Cancel();
+Console.WriteLine($"[{serverId}] 收到 dm {directReceived} 条 · dm-sync {directSync} 次");
+
+if (expect > 0)
+{
+    bool ok = directReceived == expect;
+    Console.WriteLine(ok
+        ? $"[{serverId}] 对账 OK：期望 {expect} 条，实收 {directReceived} 条"
+        : $"[{serverId}] 对账 FAIL：期望 {expect} 条，实收 {directReceived} 条");
+    Console.WriteLine($"[{serverId}] 退出");
+    return ok ? 0 : 4;
+}
+
 Console.WriteLine($"[{serverId}] 退出");
 return 0;
 

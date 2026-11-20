@@ -13,6 +13,7 @@
   <ItemGroup>
     <Compile Include="Program.cs" />
     <Compile Include="Services\PeerRegistry.cs" />
+    <Compile Include="Services\DirectSpool.cs" />
     <Compile Include="Services\HubOptions.cs" />
     <Compile Include="..\Shared\BuildInfo.cs" Link="Shared\BuildInfo.cs" />
   </ItemGroup>

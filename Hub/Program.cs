@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using System.Net.WebSockets;
 using System.Text;
 using System.Text.Json;
@@ -17,6 +18,7 @@ using SentinelLink.Shared;
 
 HubOptions options = new();
 PeerRegistry registry = new(options);
+DirectSpool spool = new(options.SpoolDirectory, options.DirectQueueLimit, options.DirectTtl);
 
 WebApplicationBuilder builder = WebApplication.CreateBuilder();
 builder.WebHost.UseUrls($"http://0.0.0.0:{options.Port}");
@@ -41,6 +43,7 @@ app.MapGet("/v1/health", () => Results.Json(new
     sptVersion = BuildInfo.SptVersion,
     peers = registry.Count,
     realms = registry.Realms,
+    dmQueued = spool.TotalCount(),
     serverTime = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()
 }));
 
@@ -120,6 +123,35 @@ app.Map("/v1/ws", async (HttpContext context) =>
         peers = registry.Snapshot(peer.Realm),
         at = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()
     });
+
+    // 补投离线私聊：连上就把队列读走（读后即删），每条都是正式投递而不是「重放通知」
+    List<DirectRecord> backlog = spool.Drain(peer.Realm, peer.ServerId);
+    if (backlog.Count > 0)
+    {
+        await registry.SendAsync(peer, new
+        {
+            type = "dm-sync",
+            count = backlog.Count,
+            at = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()
+        });
+
+        foreach (DirectRecord record in backlog)
+        {
+            await registry.SendAsync(peer, new
+            {
+                type = "dm",
+                id = record.Id,
+                from = record.From,
+                fromNick = record.FromNick,
+                to = record.To,
+                text = record.Text,
+                at = record.At,
+                replayed = true
+            });
+        }
+
+        Console.WriteLine($"  [{DateTime.Now:HH:mm:ss}] 补投 {backlog.Count} 条离线私聊 → {peer.ServerId}");
+    }
 
     byte[] buffer = new byte[8192];
     try
@@ -232,6 +264,82 @@ app.Map("/v1/ws", async (HttpContext context) =>
                 });
                 break;
 
+            case "dm":
+                string to = root.TryGetProperty("to", out JsonElement toElement)
+                    ? (toElement.GetString() ?? string.Empty).Trim()
+                    : string.Empty;
+                string dmBody = root.TryGetProperty("text", out JsonElement dmText)
+                    ? (dmText.GetString() ?? string.Empty).Trim()
+                    : string.Empty;
+
+                if (to.Length == 0 || dmBody.Length == 0)
+                {
+                    await registry.SendAsync(sender, new
+                    {
+                        type = "ack",
+                        forType = "dm",
+                        delivered = false,
+                        error = "缺少收件人或正文",
+                        at = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()
+                    });
+                    break;
+                }
+
+                if (dmBody.Length > options.MaxDirectLength)
+                {
+                    dmBody = dmBody.Substring(0, options.MaxDirectLength);
+                }
+
+                // 私聊只在本 realm 内找收件人：跨域可见性靠 realm 划分，不靠这里放行
+                HubPeer? target = registry.Find(to);
+                bool online = target != null
+                    && string.Equals(target.Realm, sender.Realm, StringComparison.Ordinal)
+                    && target.Socket != null;
+
+                DirectRecord record = spool.NewRecord(sender.Realm, sender.ServerId, sender.Nickname, to, dmBody);
+
+                if (online)
+                {
+                    await registry.SendAsync(target!, new
+                    {
+                        type = "dm",
+                        id = record.Id,
+                        from = sender.ServerId,
+                        fromNick = sender.Nickname,
+                        to,
+                        text = record.Text,
+                        at = record.At,
+                        replayed = false
+                    });
+
+                    await registry.SendAsync(sender, new
+                    {
+                        type = "ack",
+                        forType = "dm",
+                        id = record.Id,
+                        delivered = true,
+                        queued = false,
+                        at = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()
+                    });
+                }
+                else
+                {
+                    // 收件人不在线（或不在本域）：落盘排队，等它下次连上补投
+                    int pending = spool.Enqueue(record);
+                    await registry.SendAsync(sender, new
+                    {
+                        type = "ack",
+                        forType = "dm",
+                        id = record.Id,
+                        delivered = false,
+                        queued = true,
+                        pending,
+                        at = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()
+                    });
+                }
+
+                break;
+
             default:
                 // 未知帧不报错也不回包：Hub 要能被旧客户端连着不崩。
                 break;
@@ -265,6 +373,7 @@ Console.WriteLine($"  {BuildInfo.ProductName} Hub {BuildInfo.Version}  ·  SPT {
 Console.WriteLine($"  监听   http://0.0.0.0:{options.Port}   (health: /v1/health)");
 Console.WriteLine($"  邀请码 {(options.InviteKey.Length == 0 ? "<空>" : options.InviteKey)}");
 Console.WriteLine($"  超时   {options.PeerTimeout.TotalSeconds:0}s   清扫 {options.SweepInterval.TotalSeconds:0}s   单域上限 {options.MaxPeersPerRealm}");
+Console.WriteLine($"  私聊   队列 {options.DirectQueueLimit} 条/人 · 保留 {options.DirectTtl.TotalHours:0}h · 目录 {options.SpoolDirectory}");
 Console.WriteLine();
 
 await app2.RunAsync();

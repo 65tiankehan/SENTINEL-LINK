@@ -179,3 +179,44 @@ ClientFirearmController_CanPressTrigger_...      → EFT.ClientFirearmController
 - 输入法候选词本身：IMGUI `TextField` 在 EFT 里候选窗不一定出，所以中文的**确定路径**是粘贴；要做「游戏内直接打中文」得换 TMP 输入或自己画候选条。
 - 面板打开时聊天消息不滚动暂停、没有未读计数。
 - `Player.Move`/`Look` 拦截是全局前缀：将来若别的 mod 也拦同一个方法，顺序由 Harmony 决定，需要时加 `[HarmonyPriority]` 明确。
+---
+
+## P2 第 1 步：私聊通道 + 离线补投（2026-11-20）
+
+**做了什么**
+
+| 层 | 文件 | 改动 |
+|---|---|---|
+| Hub | `Hub\Services\DirectSpool.cs`（新增） | 每收件人一个 JSONL：`spool/{realm}/{serverId}.jsonl`；入队超 500 条丢最旧、保留 7 天、投递即删（读后清空）。**落盘的原因**：P2 验收是「离线消息补投 0 丢失」，只放内存的话 Hub 一重启承诺就破了。 |
+| Hub | `Hub\Services\HubOptions.cs` | 新增 `MaxDirectLength=1024`、`DirectQueueLimit`（env `SENTINEL_HUB_DM_LIMIT`，默认 500）、`DirectTtl=168h`、`SpoolDirectory`（env `SENTINEL_HUB_SPOOL`，默认 `bin/…/spool`）。 |
+| Hub | `Hub\Program.cs` | `dm` 帧：收件人在本域且在线 → 直投并回 `delivered=true`；否则入队并回 `queued=true, pending=N`。`/v1/ws` 连上后先发 `dm-sync{count}`，再把队列逐条以 `replayed=true` 补投。`/v1/health` 增 `dmQueued`。 |
+| 服务端 | `Server\Models\LinkModels.cs` | 新增 `LinkDirectMessage`、`LinkDirectSendRequest/Response`、`LinkDirectStateRequest/Response`。 |
+| 服务端 | `Server\Services\LinkState.cs` | 私聊环形缓冲 `DirectHistoryLimit=200`、`AddDirect/SnapshotDirect/MarkDirectRead`、`Unread`、`SyncBatches/LastSyncCount`。 |
+| 服务端 | `Server\Services\LinkHubClient.cs` | 处理 `dm` / `dm-sync` 帧（写 state + 落一行日志）；新增 `SendDirectAsync(to, text)`。 |
+| 服务端 | `Server\Callbacks\LinkCallbacks.cs` | `SendDirect`（空收件人/发给自己直接拒；发出后本地也留一份，界面才画得出「我发的」）、`DirectState`（`markRead` 顺手清未读）。 |
+| 服务端 | `Server\Routers\LinkRouter.cs` | 新路由 `/sentinelink/client/dm/send`、`/sentinelink/client/dm/state`。 |
+| 工具 | `Tools\SyntheticPeer\Program.cs` | 新增 `--to/--count/--delay/--expect`：连发私聊、统计收到的 `dm` 帧、按期望条数对账（不符退出码 4）。 |
+
+**实测（本机，Hub 5180）**
+
+| 场景 | 结果 |
+|---|---|
+| 离线 100 条 | 甲给没上线的 `peer-offline` 连发 100 条 → `dmQueued=100`、队列文件 `peer-offline.jsonl` 17,492 B / 100 行；`peer-offline` 上线 → 收到 `dm` **100** 条 + `dm-sync` 1 次，对账 OK；队列文件投递后消失。 |
+| 在线直投 | 甲 → 在线的乙 5 条 → 乙收到 5 条、全部 `replayed=false`、`dm-sync` 0 次、`dmQueued` 全程 0。 |
+| Hub 重启不丢 | 给离线的丙发 3 条（队列 3 行）→ **杀掉 Hub 重编重起** → `dmQueued` 仍是 3 → 丙上线收到 3 条 `replayed=true`，对账 OK。 |
+| 真服务端四跳 | 部署新 `SENTINEL.Link.Server.dll`（71,168 B / sha8 `842ED26E`）到 `E:\EFT\SPT_Runtime\user\mods\cn.passionyang.sentinellink.server\`，起 SPT 服务端 → 假对端甲发 3 条私聊给真服务端 `bc44f77d…` → 服务端日志逐条打出 `[SENTINEL Link] 私聊 甲: 私聊 #1/3 …`。 |
+| 路由注册 | `POST /sentinelink/client/dm/state` → 200（未登录回包体为空，属 SPT Web 认证层），`/sentinelink/nope` → 404。**注意 SPT 后端是 https**，探针要 `-SkipCertificateCheck`。 |
+
+**怎么跑**
+
+```powershell
+dotnet .\Hub\bin\Release\net10.0\SENTINEL.Link.Hub.dll
+dotnet .\Tools\SyntheticPeer\bin\Release\net10.0\SyntheticPeer.dll --server-id peer-a --to peer-offline --count 100
+dotnet .\Tools\SyntheticPeer\bin\Release\net10.0\SyntheticPeer.dll --server-id peer-offline --listen 8 --expect 100
+```
+
+**还没做**
+
+- 客户端面板还没有私聊页（下一个 commit）：`LinkClientModels` 要加 `dm` 字段、面板加「世界 / 私聊」两个页签、未读红点。
+- 好友名单（`friends.json`）还没落地：目前私聊靠手填对端 serverId，好友化之后才谈得上「登录即见朋友」。
+- Hub 侧的 `dm` 没有限流（一个连接可以刷爆别人的队列），P2 收尾时加每连接每秒上限。
