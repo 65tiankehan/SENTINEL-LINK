@@ -79,7 +79,7 @@
 | `serverId` | string | 你自己的 id |
 | `realm` | string | 你的域 |
 | `hubVersion` | string | Hub 版本 |
-| `peers` | array | 同域在线表，元素见下 |
+| `peers` | array | 同域在线表 —— **包含自己**（算「对端数」必须排掉自己、且只算 `online:true`） |
 | `at` | long | 毫秒 |
 
 `peers[]` 元素：`{ serverId, nickname, version, sptVersion, online, lastSeenMs }`。
@@ -195,7 +195,7 @@
 ```
 
 - `[已注册]` 没连 WS 时：**不进别人的在线表**，但仍可收离线私聊（落盘）。
-- 断线重连：`LinkHubClient` 退避 2→4→8→16→30 秒，重连成功后 Hub 会重新发 `welcome` + 补投。
+- 断线重连：`LinkHubClient` 退避 2→4→8→16→30 秒；**每轮重连都会重新 `hello` 换新 token**（旧 token 失效不致命），连接成功后 Hub 重新发 `welcome` + 补投离线私聊。
 
 ## 5. 兼容性矩阵（v1）
 
@@ -216,6 +216,8 @@
 | 域标记 | 永远尾 4 位 `1e0f`（判「是不是我们的」只认这 4 位） | — |
 
 **铁律**：`DialogueController.GetDialogByIdFromProfile` 对未知 dialogId 会**新建对话并写进 profile**。任何把虚拟 id 放给原生的路径都必须先判域标记并短路，否则脏档（P2a 踩过：多出一条空对话 `23041e039769da209d161e0f`）。
+
+**world 频道 id（P2b 用，同一套域标记）**：`sha256("sentinel.link.world:" + realm + ":" + channel)` 前 20 hex + `1e0f`；`channel` 取 `world` / `trade` / `lfg`（对应「世界 / 交易 / 求组」）。同一 realm 内所有实例派生出的 id 必须一致 —— 这是「各实例自己造会话、客户端看到同一个频道」的前提。
 
 ## 7. 扩展流程（P3/P4/P5 照做）
 

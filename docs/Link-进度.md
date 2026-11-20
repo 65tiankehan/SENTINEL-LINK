@@ -1,6 +1,25 @@
 # SENTINEL Link 进度
 
 > 一条一次，带数字。发版前把关键条目挪进计划书。
+## 当前状态（2026-11-21 01:03，随提交更新）
+## 当前状态（2026-11-21 01:0x，随提交更新）
+
+| 阶段 | 状态 | 提交 | 关键数字 |
+|---|---|---|---|
+| P0 骨架 | ✅ | `3bbfff2` | Hub health/hello/ws 通，四跳对账 OK |
+| P1 世界聊天面板 | ✅ | `25ca19c` `93058de` `d36eb00` | 面板实收 10 条；宿主挂 `BaseUnityPlugin`；F11/Ctrl+L |
+| P1.5 协议冻结 | ✅ | `55abcd5` | `docs\Hub-协议.md` 252 行，10 类帧 |
+| P2b-1 Hub 私聊 + 落盘队列 | ✅ | `de4a7a3` | 离线 100/100 对账，重启不丢 |
+| P2a 原生好友 + 私聊 | ✅ | `158344d` `32a5c61` | 好友 +1 / 对话 +1 / 消息 3~4；profile 字节差 0 |
+| P2b-2 世界频道 + 局内入口 | ⬜ 下一步 | — | 方案 B2（服务端造 `GlobalChat` 会话） |
+
+**未验清单**
+
+1. 对端**在线时**的即时投递（只验过离线排队 → 上线补投）；
+2. 两个真实 SPT 实例跨服（只用假对端验过）；
+3. 原生聊天窗里发消息穿到假对端（`SendMessage` 前缀是否真被 UI 触发）；
+4. 面板在线数修正后的真机显示（`_peerCount` 排除自己，未截图复验）。
+
 
 ## 2026-11-20 · P0 第 1 步：仓库 + 服务端骨架
 
@@ -96,7 +115,7 @@ dotnet bin\Release\net10.0\SyntheticPeer.dll --hub http://127.0.0.1:5180 --serve
 | 项 | 内容 |
 |---|---|
 | 新工程 | `Client\SENTINEL.Link.Client.csproj`（net48 BepInEx 插件，`AssemblyName=SENTINEL.Link.Client`） |
-| 入口 | `Client\Plugin.cs`：`[BepInPlugin("cn.passionyang.sentinellink.client","SENTINEL Link","0.1.0")]` + `[BepInProcess("EscapeFromTarkov.exe")]`，热键 **F10**（F7 是 Min、F9 是完整版菜单） |
+| 入口 | `Client\Plugin.cs`：`[BepInPlugin("cn.passionyang.sentinellink.client","SENTINEL Link","0.1.0")]` + `[BepInProcess("EscapeFromTarkov.exe")]`，热键 **F11（`d36eb00` 起从 F10 改绑）**（F7 是 Min、F9 是完整版菜单） |
 | 宿主 | `Client\UI\LinkChatBehaviour.cs`：DontDestroyOnLoad 的 GameObject，Update 处理键位、OnGUI 交给面板 |
 | 面板 | `Client\UI\LinkChatPanel.cs`：右侧 436 宽卡片，头部状态胶囊 + realm/对端数，中部消息流（滚轮翻历史），底部输入框 + 发送，页脚提示 |
 | 数据 | `Client\Core\LinkApi.cs`：`SPT.Common.Http.RequestHandler.PostJsonAsync` → `/sentinelink/client/chat/state`、`/chat/send`；后台线程轮询 2 s，结果加锁合并，OnGUI 里绝不 await |
@@ -119,7 +138,7 @@ dotnet bin\Release\net10.0\SyntheticPeer.dll --hub http://127.0.0.1:5180 --serve
 
 1. 起 Hub：`cd Hub; $env:SENTINEL_HUB_PORT="5180"; dotnet run -c Release --no-build`
 2. 起 SPT 服务端 + 启动器，进主菜单
-3. 游戏里按 **F10**：面板应从右侧滑出，头部胶囊显示「已连接 Hub」；若显示「未连接」，先看 `BepInEx\LogOutput.log` 有无 `[Link] state 拉取失败`
+3. 游戏里按 **F11（`d36eb00` 起从 F10 改绑）**：面板应从右侧滑出，头部胶囊显示「已连接 Hub」；若显示「未连接」，先看 `BepInEx\LogOutput.log` 有无 `[Link] state 拉取失败`
 4. 用假对端发一条：`SyntheticPeer --hub http://127.0.0.1:5180 --server-id peer-b --nickname 路人B --chat "面板收到吗"` → 面板 2 s 内出现「路人B：面板收到吗」
 5. 面板里输入文字回车 → 假对端（带 `--listen 8`）应打印 `chat` 帧；发送方自己收到的是 `ack`，不重复显示
 

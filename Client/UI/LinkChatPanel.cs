@@ -193,7 +193,26 @@ namespace SentinelLink.Client.UI
         {
             _hubState = string.IsNullOrEmpty(snapshot.HubState) ? "unlinked" : snapshot.HubState;
             _realm = string.IsNullOrEmpty(snapshot.Realm) ? "default" : snapshot.Realm;
-            _peerCount = snapshot.Peers?.Count ?? 0;
+
+            // Hub 的 peers 列表**包含自己**，面板上的「对端在线」必须只算别人且只算 online，
+            // 否则一个对端都没有时会显示「1 个」（自己）——P2a 真机截图踩过。
+            int onlinePeers = 0;
+            if (snapshot.Peers != null)
+            {
+                foreach (LinkPeer peer in snapshot.Peers)
+                {
+                    if (peer == null || !peer.Online)
+                    {
+                        continue;
+                    }
+                    if (!string.IsNullOrEmpty(snapshot.ServerId) && peer.ServerId == snapshot.ServerId)
+                    {
+                        continue;
+                    }
+                    onlinePeers++;
+                }
+            }
+            _peerCount = onlinePeers;
 
             // 服务端把自己的 serverId 一起报上来，才能把「我发的」和「别人发的」分开画。
             if (!string.IsNullOrEmpty(snapshot.ServerId) && snapshot.ServerId != _ownServerId)
@@ -369,7 +388,7 @@ namespace SentinelLink.Client.UI
 
             y += 52f;
             MinDraw.Text(new Rect(x, y, innerWidth, 16f),
-                "realm " + _realm + "   ·   " + _peerCount + " 个对端在线",
+                "realm " + _realm + "   ·   " + _peerCount + " 个对端在线（不含自己）",
                 10, MinTheme.LabelTertiary);
             y += 20f;
             MinDraw.Line(new Rect(x, y, innerWidth, 1f), MinTheme.Separator);
