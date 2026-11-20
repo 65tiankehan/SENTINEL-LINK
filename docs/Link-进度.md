@@ -220,3 +220,22 @@ dotnet .\Tools\SyntheticPeer\bin\Release\net10.0\SyntheticPeer.dll --server-id p
 - 客户端面板还没有私聊页（下一个 commit）：`LinkClientModels` 要加 `dm` 字段、面板加「世界 / 私聊」两个页签、未读红点。
 - 好友名单（`friends.json`）还没落地：目前私聊靠手填对端 serverId，好友化之后才谈得上「登录即见朋友」。
 - Hub 侧的 `dm` 没有限流（一个连接可以刷爆别人的队列），P2 收尾时加每连接每秒上限。
+---
+
+## 计划修订：P2 拆成 P2a / P2b，新增 P1.5（2026-11-20）
+
+**为什么改**：读了 nekoNx 的源码才发现，好友与私聊这两块**不需要自建 UI**——它的 `NekoNet.Server.Friends\Patches\GetFriendListPatch.cs` 是服务端 Harmony Postfix `DialogueController.GetFriendList`，把跨服对端拼成 `UserDialogInfo` 塞进 `__result.Friends`，原生好友面板自己就把人画出来了。我实测 4.1.6 的 `DialogueController`（`SPTarkov.Server.Core.dll`，29 个方法）签名齐全：`GetFriendList` / `GenerateDialogueList` / `GenerateDialogueView` / `SendMessage(MongoId, SendMessageRequest)` / `GetDialogueInfo` / `SetRead` 都在，所以这条路我们能走。
+
+**改了什么**（`docs\SENTINEL-Link-计划书.md` 116 → 123 行 / 9,656 B）
+
+| 改动 | 内容 |
+|---|---|
+| 路线表加「状态」列 | P0 `3bbfff2`、P1 `25ca19c`/`93058de`/`d36eb00` 标 ✅；P2b 标「面板已交付，缺私聊页签」 |
+| 新增 **P1.5 协议冻结** | 8 类帧（`hello/welcome/presence/chat/ack/dm/dm-sync/ping`）写成 `docs\Hub-协议.md`，规则「只增字段不删、未知帧忽略」 |
+| P2 拆 **P2a** | 服务端 patch `DialogueController` 四个方法，把跨服好友与消息造进原生 UI；跨服消息只落 `LinkState` + Hub spool，**不写 profile** |
+| P2 拆 **P2b** | 自建面板只做原生做不到的：局内私聊、世界频道、诊断；后续照 neko 复制 `DefaultUIButton` 给背包注入入口 |
+| P2a 新验收 | 好友出现 ≤ 3 s；离线补投 0 丢失；**存档不脏写**：profile `dialogues` 条目差 0、文件字节差 0 |
+| P3 依赖改 | 从「P2」改成「P1.5」——报价同步不需要好友 UI，早做早验幂等表 |
+| 风险表 +3 行 | patch 被打穿→降级回自建面板不崩游戏；写脏 `dialogues`→只走 LinkState/spool；32 hex→24 hex MongoId 派生冲突→前 20 位 + 4 位域标记 + 启动查重 |
+
+**为什么不直接砍掉自建面板**：世界频道原生没有这个概念；局内原生没有聊天入口（neko 也得自己往背包塞按钮）。面板退成「补原生做不到的两块」，不跟任何 UI 打架。
