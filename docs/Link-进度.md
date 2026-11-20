@@ -329,3 +329,20 @@ dotnet D:\sptEdior\SENTINELLink\Tools\SyntheticPeer\bin\Release\net10.0\Syntheti
 
 - 文档里的每条错误文案都与 `Hub\Program.cs` / `PeerRegistry.cs` 的实际字符串逐字对过（`邀请码错误` / `serverId 不能为空` / `realm <域> 已满（上限 N）` / `缺少收件人或正文`）。
 - 本次只写文档，**没有改代码**：v1 靠字段集识别，未加显式 `proto` 字段；真要协商版本时按扩展流程加，旧端会当未知字段忽略。
+
+## 竞品研究：nekoNx 全量摸底（2026-11-21 01:20）
+
+用户提了很对的一点：不该一问一答地摸，先把 neko 整体搞清楚。新建 `docs\neko-研究.md`（约 200 行）。
+
+| 章节 | 内容 |
+|---|---|
+| 画像与规模 | 反编译产物 588 文件 / 客户端 7 插件 / 服务端 11 mod / 客户端打点 41 处 / 服务端 33 个补丁类 / 24 条路由 |
+| 架构 | 客户端 → 本机 SPT 服务端 → Hub ← 别人 SPT；客户端从不直连 Hub |
+| 七模块逐条 | Core / Friends / PrivateChat / WorldChat / MarketGlow / Airdrop / GameState / GroupEX，各自打点、数据流、可借鉴点 |
+| 值得抄 8 条 | Postfix 造数据不写档 / 复用原生 UI / 放宽输入校验 / 离线队列补投 / serverId 落盘 / Action 事件解耦 / 全 patch try-catch / 配置集中 |
+| 不该学 5 条 | 替换 Fika MatchMaker UI / 依赖 GClassNNN / 塞 profile / 无保活长连 / patch SaveServer.GetProfile |
+| 4.1.6 对照表 | `SocialNetworkClass→EFT.SocialNetwork`、`ChatMessageClass→DialogueChatMessage`、`GClass1059→ChatRoomInformation`、`GDelegate33_0→ChatSendDelegate`、`GClass1628→UpdatableBindableList` |
+| 取舍 | 做世界频道/私聊/跳蚤/空投；不做 P2P 打洞、竞技场、MatchMaker 替换；Hub 本体不在仓库，得自己补 |
+
+- 世界频道结论：neko **复用客户端原生聊天列表**（造 `type=9 GlobalChat` 的 pinned 会话 + `DisplayMessage` 塞消息），不重画 UI；我们 4.1.6 的 public API 反而更干净（`DisplayMessage` 是公开方法，neko 那段 `SafeDisplay` 反编译不出来）。
+- 下一步仍按 B2：服务端虚拟 `world` 会话，复用 P2a 的四个补丁；实现前先把每个模块的细节按需再深挖（这次只到「能判断可行性 + 能估工」的深度）。
