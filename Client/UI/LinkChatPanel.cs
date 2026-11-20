@@ -49,6 +49,11 @@ namespace SentinelLink.Client.UI
         private float _statusUntil;
         private GUIStyle _inputStyle;
 
+        // 打开面板前的输入状态，关闭时原样还回去
+        private CursorLockMode _prevLockState;
+        private bool _prevCursorVisible;
+        private IMECompositionMode _prevImeMode;
+
         public bool Visible => _visible;
 
         public LinkChatPanel(ConfigEntry<KeyCode> toggleKey)
@@ -58,17 +63,52 @@ namespace SentinelLink.Client.UI
 
         public void Toggle()
         {
-            _visible = !_visible;
             if (_visible)
             {
-                _nextPoll = 0f;
-                _status = "";
+                Close();
+                return;
             }
+
+            _visible = true;
+            _nextPoll = 0f;
+            _status = "";
+            EnterInputMode();
         }
 
         public void Close()
         {
+            if (!_visible)
+            {
+                return;
+            }
+
             _visible = false;
+            ExitInputMode();
+        }
+
+        /// <summary>
+        /// 接管输入：解锁光标（不然鼠标被锁在屏幕中心点不到输入框）、
+        /// 打开输入法（不然中文候选词出不来）、掐住角色输入（不然边打字边跑边开枪）。
+        /// </summary>
+        private void EnterInputMode()
+        {
+            _prevLockState = Cursor.lockState;
+            _prevCursorVisible = Cursor.visible;
+            Cursor.lockState = CursorLockMode.None;
+            Cursor.visible = true;
+
+            _prevImeMode = Input.imeCompositionMode;
+            Input.imeCompositionMode = IMECompositionMode.On;
+
+            Patches.LinkInputLock.Locked = true;
+        }
+
+        private void ExitInputMode()
+        {
+            Patches.LinkInputLock.Locked = false;
+            Cursor.lockState = _prevLockState;
+            Cursor.visible = _prevCursorVisible;
+            Input.imeCompositionMode = _prevImeMode;
         }
 
         public void Dispose()
@@ -98,6 +138,20 @@ namespace SentinelLink.Client.UI
             {
                 Toggle();
                 Plugin.Log?.LogInfo("[Link] 面板 " + (_visible ? "打开" : "关闭"));
+            }
+
+            // EFT 自己每帧会去锁光标，我们放开后要持续压回去，否则鼠标一闪就又被吃走
+            if (_visible)
+            {
+                if (Cursor.lockState != CursorLockMode.None)
+                {
+                    Cursor.lockState = CursorLockMode.None;
+                }
+
+                if (!Cursor.visible)
+                {
+                    Cursor.visible = true;
+                }
             }
 
             lock (_sync)
@@ -191,6 +245,51 @@ namespace SentinelLink.Client.UI
             _messages.Sort((a, b) => a.At.CompareTo(b.At));
         }
 
+        /// <summary>往页脚状态位塞一句话（4 秒后自动退回提示文案）。</summary>
+        private void Flash(string text, bool bad)
+        {
+            lock (_sync)
+            {
+                _pendingStatus = text;
+                _pendingBad = bad;
+            }
+        }
+
+        /// <summary>
+        /// 从系统剪贴板贴一段文字进输入框。
+        /// IMGUI 的 TextField 吃不到 Windows 输入法的候选词，所以中文用「别处打好再贴」这条路。
+        /// </summary>
+        private void PasteClipboard()
+        {
+            string clip;
+            try
+            {
+                clip = GUIUtility.systemCopyBuffer;
+            }
+            catch (Exception ex)
+            {
+                Flash("读剪贴板失败：" + ex.GetType().Name, true);
+                return;
+            }
+
+            if (string.IsNullOrEmpty(clip))
+            {
+                Flash("剪贴板是空的", true);
+                return;
+            }
+
+            clip = clip.Replace("\r", " ").Replace("\n", " ").Trim();
+            if (clip.Length == 0)
+            {
+                Flash("剪贴板里没有文字", true);
+                return;
+            }
+
+            string merged = (_input ?? "") + clip;
+            _input = merged.Length > 200 ? merged.Substring(0, 200) : merged;
+            Flash("已粘贴 " + clip.Length + " 字", false);
+        }
+
         private void Send()
         {
             string text = (_input ?? "").Trim();
@@ -260,7 +359,7 @@ namespace SentinelLink.Client.UI
 
             MinDraw.Chip(new Rect(x, y + 14f, 34f, 34f), MinTheme.Blue, "链");
             MinDraw.Text(new Rect(x + 44f, y + 10f, innerWidth - 44f, 22f), "SENTINEL LINK", 15, MinTheme.LabelPrimary, TextAnchor.MiddleLeft, FontStyle.Bold);
-            MinDraw.Text(new Rect(x + 44f, y + 30f, innerWidth - 44f, 16f), BuildInfo.DisplayLine + "  ·  v" + BuildInfo.Version, 10, MinTheme.LabelTertiary);
+            MinDraw.Text(new Rect(x + 44f, y + 30f, innerWidth - 44f, 16f), SentinelLink.Shared.BuildInfo.DisplayLine + "  ·  v" + SentinelLink.Shared.BuildInfo.Version, 10, MinTheme.LabelTertiary);
 
             Color stateColor = StateColor(_hubState);
             string stateText = LocalizeState(_hubState);
@@ -376,11 +475,19 @@ namespace SentinelLink.Client.UI
             if (GUI.GetNameOfFocusedControl() == "link-input")
             {
                 Event current = Event.current;
-                if (current != null && current.type == EventType.KeyDown &&
-                    (current.keyCode == KeyCode.Return || current.keyCode == KeyCode.KeypadEnter))
+                if (current != null && current.type == EventType.KeyDown)
                 {
-                    Send();
-                    current.Use();
+                    if (current.keyCode == KeyCode.Return || current.keyCode == KeyCode.KeypadEnter)
+                    {
+                        Send();
+                        current.Use();
+                    }
+                    else if (current.keyCode == KeyCode.V && (current.control || current.command))
+                    {
+                        // 输入法在 IMGUI 里不稳，给一条确定能用的中文入口：别的软件里打好，Ctrl+V 贴进来
+                        PasteClipboard();
+                        current.Use();
+                    }
                 }
             }
 
@@ -401,7 +508,7 @@ namespace SentinelLink.Client.UI
 
             string left = Time.realtimeSinceStartup < _statusUntil && !string.IsNullOrEmpty(_status)
                 ? _status
-                : "回车发送 · Esc 关闭 · 滚轮翻历史";
+                : "回车发送 · Ctrl+V 粘贴中文 · Esc 关闭";
             Color color = Time.realtimeSinceStartup < _statusUntil && _statusBad
                 ? MinTheme.Red
                 : MinTheme.LabelTertiary;

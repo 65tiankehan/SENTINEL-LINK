@@ -129,3 +129,53 @@ dotnet bin\Release\net10.0\SyntheticPeer.dll --hub http://127.0.0.1:5180 --serve
 - 面板打开时游戏仍响应鼠标/键盘（没有拦输入），会误触开火 —— P2 加「打开时锁输入」。
 - 消息只有 `at/from/nickname/text`，没有频道概念（世界/好友/队伍），频道在 P2。
 - 未读提示、@提及、表情、本地历史落盘都没有。
+
+## P1 第 2 步（2026-11-20 23:18）：打开面板锁游戏输入 + 中文入口
+
+前一步只解决了「画得出来」，这一步解决「能用」：面板打开时角色不再乱跑、点发送不再顺带开枪、中文有确定的输入路径。
+
+**改了什么**
+
+| 项 | 文件 | 做法 |
+|---|---|---|
+| 移动/转视角 | `Client\Patches\InputLockPatches.cs` | Harmony 前缀拦 `Player.Move(Vector2)`、`Player.Look(float,float,bool)`、`Player.Rotate(Vector2,bool)`，只在 `IsYourPlayer` 且面板打开时返回 false |
+| 开火 | 同上 | `ClientFirearmController.CanPressTrigger()` 前缀在面板打开时 `__result = false` 并 return false |
+| 光标 | `Client\UI\LinkChatPanel.cs` | 打开时记下 `Cursor.lockState/visible`，改成 `None/true`；关闭时原样还回去。EFT 自己每帧会重新锁光标，所以 `Tick()` 里每帧压回去 |
+| 输入法 | 同上 | 打开时 `Input.imeCompositionMode = On`，关闭时还原 |
+| 中文兜底 | 同上 | `Ctrl+V` 读 `GUIUtility.systemCopyBuffer` 插进输入框（IMGUI 吃不到候选词时的确定路径），页脚提示改成「回车发送 · Ctrl+V 粘贴中文 · Esc 关闭」 |
+| 补丁挂载 | `Client\Plugin.cs` | `Awake` 里 `new Harmony(BuildInfo.ClientGuid).PatchAll(assembly)`，日志打「输入锁补丁已应用 · N 个方法」 |
+
+**为什么用补丁而不是设标志**：EFT 的输入是每帧从 `GamePlayerOwner` 直读的，没有公开的「暂停输入」开关；唯一稳的做法是在真正吃输入的方法上拦一刀。只掐 `IsYourPlayer` —— 联机时别人走同一条基类方法，全局拦截会把队友冻住。
+
+**两个编译器坑（都实测过）**
+
+1. `Assembly-CSharp.dll` 里有一个**全局命名空间**的 `BuildInfo` 类型，它会静默压掉 `using SentinelLink.Shared;` 引入的 `BuildInfo` —— 报错形式是「BuildInfo 未包含 DisplayLine 的定义」，看起来像自己的类坏了。修法：调用点写全 `SentinelLink.Shared.BuildInfo`。
+2. `using HarmonyLib;` 会带进 `HarmonyLib.BuildInfo`，与上面的全局类型叠加后连别名 `using BuildInfo = ...` 都报 CS0576。结论：这个仓库里一律全限定，不用别名。
+
+**构建与部署**
+
+- `dotnet build .\Client\SENTINEL.Link.Client.csproj -c Release -p:SptClientDir=E:\EFT --no-incremental` → **0 警告 0 错误**
+- `SENTINEL.Link.Client.dll` **32,768 B**，sha8 **1049A161**
+- 已覆盖 `E:\EFT` 与 `E:\EFT-Fika` 的 `BepInEx\plugins\SENTINEL.Link\`（两处 sha8 一致）
+
+**Cecil 自检（成品 dll 里的补丁目标）**
+
+```
+Player_Move_InputLockPatch                       → EFT.Player | Move
+Player_Look_InputLockPatch                       → EFT.Player | Look
+Player_Rotate_InputLockPatch                     → EFT.Player | Rotate
+ClientFirearmController_CanPressTrigger_...      → EFT.ClientFirearmController | CanPressTrigger
+```
+
+**怎么验**
+
+1. 重启游戏（客户端 dll 换了），`BepInEx\LogOutput.log` 里应有 `[Link] 输入锁补丁已应用 · 4 个方法`
+2. 进战局按 F11：**角色应立刻停住、视角锁死、鼠标能点到输入框**；在输入框里点一下发送按钮，不应该开枪
+3. 别处打好中文 → 面板里 `Ctrl+V` → 输入框出现文字、页脚闪「已粘贴 N 字」→ 回车发送
+4. 按 Esc 或 F11 关闭：角色恢复移动、视角恢复、光标重新被游戏锁住、`imeCompositionMode` 还原
+
+**仍然没做**（留给 P2）
+
+- 输入法候选词本身：IMGUI `TextField` 在 EFT 里候选窗不一定出，所以中文的**确定路径**是粘贴；要做「游戏内直接打中文」得换 TMP 输入或自己画候选条。
+- 面板打开时聊天消息不滚动暂停、没有未读计数。
+- `Player.Move`/`Look` 拦截是全局前缀：将来若别的 mod 也拦同一个方法，顺序由 Harmony 决定，需要时加 `[HarmonyPriority]` 明确。

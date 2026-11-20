@@ -21,6 +21,14 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <Reference Include="0Harmony">
+      <HintPath>$(SptClientDir)\BepInEx\core\0Harmony.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="Assembly-CSharp">
+      <HintPath>$(SptClientDir)\EscapeFromTarkov_Data\Managed\Assembly-CSharp.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
     <Reference Include="BepInEx">
       <HintPath>$(SptClientDir)\BepInEx\core\BepInEx.dll</HintPath>
       <Private>false</Private>
@@ -59,6 +67,7 @@
     <Compile Include="Plugin.cs" />
     <Compile Include="Core\**\*.cs" />
     <Compile Include="Models\**\*.cs" />
+    <Compile Include="Patches\**\*.cs" />
     <Compile Include="UI\**\*.cs" />
     <Compile Include="..\Shared\BuildInfo.cs" Link="Shared\BuildInfo.cs" />
     <!-- UI 复用 Min 的绘制层：同一份代码，避免两套圆角/字号各走一路 -->

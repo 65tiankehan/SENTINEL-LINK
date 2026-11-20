@@ -1,7 +1,9 @@
 using System;
+using System.Linq;
 using BepInEx;
 using BepInEx.Configuration;
 using BepInEx.Logging;
+using HarmonyLib;
 using SentinelLink.Client.UI;
 using SentinelLink.Shared;
 using UnityEngine;
@@ -16,7 +18,7 @@ namespace SentinelLink.Client
     /// 注意：Update/OnGUI 直接写在 BaseUnityPlugin 子类上（和 SENTINEL Min 一样），
     /// 不要另建 GameObject 挂 Behaviour —— 那条路在 EFT 里实测收不到 Update。
     /// </summary>
-    [BepInPlugin(BuildInfo.ClientGuid, BuildInfo.ProductName, BuildInfo.Version)]
+    [BepInPlugin(SentinelLink.Shared.BuildInfo.ClientGuid, SentinelLink.Shared.BuildInfo.ProductName, SentinelLink.Shared.BuildInfo.Version)]
     [BepInProcess("EscapeFromTarkov.exe")]
     public sealed class Plugin : BaseUnityPlugin
     {
@@ -40,7 +42,19 @@ namespace SentinelLink.Client
 
             _panel = new LinkChatPanel(toggleKey);
 
-            Log.LogInfo($"{BuildInfo.ProductName} {BuildInfo.Version} 已加载 · {toggleKey.Value} / Ctrl+L 打开世界聊天");
+            try
+            {
+                Harmony harmony = new Harmony(SentinelLink.Shared.BuildInfo.ClientGuid);
+                harmony.PatchAll(typeof(Plugin).Assembly);
+                Log.LogInfo($"[Link] 输入锁补丁已应用 · {harmony.GetPatchedMethods().Count()} 个方法");
+            }
+            catch (Exception ex)
+            {
+                // 补丁失败不影响看消息，只是打字时会带着角色乱跑
+                Log.LogError("[Link] 输入锁补丁失败：" + ex);
+            }
+
+            Log.LogInfo($"{SentinelLink.Shared.BuildInfo.ProductName} {SentinelLink.Shared.BuildInfo.Version} 已加载 · {toggleKey.Value} / Ctrl+L 打开世界聊天");
         }
 
         private void Update()
