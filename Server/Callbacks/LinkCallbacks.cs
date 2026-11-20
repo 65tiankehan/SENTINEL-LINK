@@ -93,6 +93,8 @@ public sealed class LinkCallbacks(
         LinkChatStateResponse response = new()
         {
             HubState = state.HubState,
+            ServerId = state.ServerId,
+            Nickname = state.Nickname,
             Realm = state.Realm,
             Peers = state.SnapshotPeers(),
             Messages = state.SnapshotChat(request.SinceMs),

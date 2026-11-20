@@ -129,6 +129,12 @@ public sealed record LinkChatStateResponse
     [JsonPropertyName("hubState")]
     public string HubState { get; init; } = "";
 
+    [JsonPropertyName("serverId")]
+    public string ServerId { get; init; } = "";
+
+    [JsonPropertyName("nickname")]
+    public string Nickname { get; init; } = "";
+
     [JsonPropertyName("realm")]
     public string Realm { get; init; } = "";
 

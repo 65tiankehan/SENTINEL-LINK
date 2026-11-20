@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
+using BepInEx.Configuration;
 using SentinelLink.Client.Core;
 using SentinelLink.Client.Models;
 using SentinelLink.Shared;
@@ -28,6 +29,7 @@ namespace SentinelLink.Client.UI
 
         private readonly object _sync = new object();
         private readonly List<LinkMessage> _messages = new List<LinkMessage>();
+        private readonly ConfigEntry<KeyCode> _toggleKey;
 
         private bool _visible;
         private string _input = "";
@@ -48,6 +50,11 @@ namespace SentinelLink.Client.UI
         private GUIStyle _inputStyle;
 
         public bool Visible => _visible;
+
+        public LinkChatPanel(ConfigEntry<KeyCode> toggleKey)
+        {
+            _toggleKey = toggleKey;
+        }
 
         public void Toggle()
         {
@@ -72,6 +79,27 @@ namespace SentinelLink.Client.UI
         // ── 后台轮询（每 2 s）──────────────────────────────────────────────
         public void Tick()
         {
+            // 键位：配置键 / F11 / Ctrl+L 三个入口（F 键在 EFT 菜单里可能被吞，Ctrl+L 兜底）
+            bool toggle = false;
+            if (_toggleKey != null && Input.GetKeyDown(_toggleKey.Value))
+            {
+                toggle = true;
+            }
+            else if (Input.GetKeyDown(KeyCode.F11))
+            {
+                toggle = true;
+            }
+            else if (Input.GetKey(KeyCode.LeftControl) && Input.GetKeyDown(KeyCode.L))
+            {
+                toggle = true;
+            }
+
+            if (toggle)
+            {
+                Toggle();
+                Plugin.Log?.LogInfo("[Link] 面板 " + (_visible ? "打开" : "关闭"));
+            }
+
             lock (_sync)
             {
                 if (!string.IsNullOrEmpty(_pendingStatus))
@@ -112,6 +140,16 @@ namespace SentinelLink.Client.UI
             _hubState = string.IsNullOrEmpty(snapshot.HubState) ? "unlinked" : snapshot.HubState;
             _realm = string.IsNullOrEmpty(snapshot.Realm) ? "default" : snapshot.Realm;
             _peerCount = snapshot.Peers?.Count ?? 0;
+
+            // 服务端把自己的 serverId 一起报上来，才能把「我发的」和「别人发的」分开画。
+            if (!string.IsNullOrEmpty(snapshot.ServerId) && snapshot.ServerId != _ownServerId)
+            {
+                _ownServerId = snapshot.ServerId;
+                foreach (LinkMessage existing in _messages)
+                {
+                    existing.Local = existing.From == _ownServerId;
+                }
+            }
 
             foreach (LinkMessage message in snapshot.Messages)
             {
@@ -222,7 +260,7 @@ namespace SentinelLink.Client.UI
 
             MinDraw.Chip(new Rect(x, y + 14f, 34f, 34f), MinTheme.Blue, "链");
             MinDraw.Text(new Rect(x + 44f, y + 10f, innerWidth - 44f, 22f), "SENTINEL LINK", 15, MinTheme.LabelPrimary, TextAnchor.MiddleLeft, FontStyle.Bold);
-            MinDraw.Text(new Rect(x + 44f, y + 30f, innerWidth - 44f, 16f), BuildInfo.Describe() + "  ·  v" + BuildInfo.Version, 10, MinTheme.LabelTertiary);
+            MinDraw.Text(new Rect(x + 44f, y + 30f, innerWidth - 44f, 16f), BuildInfo.DisplayLine + "  ·  v" + BuildInfo.Version, 10, MinTheme.LabelTertiary);
 
             Color stateColor = StateColor(_hubState);
             string stateText = LocalizeState(_hubState);
@@ -363,13 +401,13 @@ namespace SentinelLink.Client.UI
 
             string left = Time.realtimeSinceStartup < _statusUntil && !string.IsNullOrEmpty(_status)
                 ? _status
-                : "回车发送  ·  Esc 关闭";
+                : "回车发送 · Esc 关闭 · 滚轮翻历史";
             Color color = Time.realtimeSinceStartup < _statusUntil && _statusBad
                 ? MinTheme.Red
                 : MinTheme.LabelTertiary;
 
             MinDraw.Text(new Rect(x, y, width - 90f, 20f), left, 10, color);
-            MinDraw.Text(new Rect(x + width - 90f, y, 90f, 20f), "F10 收起", 10, MinTheme.LabelTertiary, TextAnchor.MiddleRight);
+            MinDraw.Text(new Rect(x + width - 90f, y, 90f, 20f), "F11 / Ctrl+L", 10, MinTheme.LabelTertiary, TextAnchor.MiddleRight);
         }
 
         // ── 小工具 ─────────────────────────────────────────────────────────

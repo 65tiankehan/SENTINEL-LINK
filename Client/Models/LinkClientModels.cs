@@ -10,6 +10,12 @@ namespace SentinelLink.Client.Models
         [JsonProperty("hubState")]
         public string HubState { get; set; } = "unlinked";
 
+        [JsonProperty("serverId")]
+        public string ServerId { get; set; } = "";
+
+        [JsonProperty("nickname")]
+        public string Nickname { get; set; } = "";
+
         [JsonProperty("realm")]
         public string Realm { get; set; } = "";
 
