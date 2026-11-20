@@ -22,7 +22,8 @@ public sealed class LinkServerLoad(
     ISptLogger<LinkServerLoad> logger,
     LinkState state,
     LinkHubClient hub,
-    LinkFriends friends) : IOnLoad
+    LinkFriends friends,
+    SPTarkov.Server.Core.Servers.SaveServer saveServer) : IOnLoad
 {
     public Task OnLoadAsync(CancellationToken cancellationToken)
     {
@@ -51,8 +52,32 @@ public sealed class LinkServerLoad(
         }
 
         ApplyDialoguePatches(friends);
+        PurgeGhostDialogues(friends);
 
         return Task.CompletedTask;
+    }
+
+    /// <summary>
+    /// 清掉历史误写进 profile 的虚拟对话空壳（早期版本在「解析不到对端」时放过原生，
+    /// DialogueController.GetDialogByIdFromProfile 会把未知 dialogId 写进 DialogueRecords）。
+    /// 只删「id 带域标记 且 users/messages 都为空」的记录，真实对话一律不动。
+    /// </summary>
+    private void PurgeGhostDialogues(LinkFriends friends)
+    {
+        try
+        {
+            System.Collections.Generic.Dictionary<SPTarkov.Server.Core.Models.Common.MongoId, SPTarkov.Server.Core.Models.Eft.Profile.SptProfile> profiles =
+                saveServer.GetProfiles();
+            int removed = friends.PurgeStaleDialogues(profiles.Values, message => logger.Warning(message));
+            if (removed > 0)
+            {
+                logger.Warning("[P2a] 已清理 " + removed + " 条虚拟对话空壳（profile 已恢复干净）");
+            }
+        }
+        catch (Exception ex)
+        {
+            logger.Warning("[P2a] 清理虚拟对话空壳失败（不影响运行）：" + ex.Message);
+        }
     }
 
     /// <summary>

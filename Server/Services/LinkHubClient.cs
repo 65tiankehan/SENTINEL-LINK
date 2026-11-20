@@ -180,15 +180,28 @@ public sealed class LinkHubClient : IDisposable
         return tokenText;
     }
 
+    /// <summary>Hub 的 PeerTimeout 是 45 秒，空闲时必须自己发 ping，否则会被清扫掉线。</summary>
+    private static readonly TimeSpan KeepAliveInterval = TimeSpan.FromSeconds(15);
+
     private async Task PumpAsync(ClientWebSocket socket, CancellationToken token)
     {
         byte[] buffer = new byte[16 * 1024];
+        ArraySegment<byte> segment = new(buffer);
+        Task<WebSocketReceiveResult> pending = socket.ReceiveAsync(segment, token);
+
         while (socket.State == WebSocketState.Open && !token.IsCancellationRequested)
         {
-            WebSocketReceiveResult result = await socket
-                .ReceiveAsync(new ArraySegment<byte>(buffer), token)
+            Task finished = await Task
+                .WhenAny(pending, Task.Delay(KeepAliveInterval, token))
                 .ConfigureAwait(false);
 
+            if (finished != pending)
+            {
+                await SendKeepAliveAsync(socket, token).ConfigureAwait(false);
+                continue;
+            }
+
+            WebSocketReceiveResult result = await pending.ConfigureAwait(false);
             if (result.MessageType == WebSocketMessageType.Close)
             {
                 break;
@@ -197,6 +210,31 @@ public sealed class LinkHubClient : IDisposable
             _state.LastFrameMs = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
             string text = Encoding.UTF8.GetString(buffer, 0, result.Count);
             HandleFrame(text);
+
+            pending = socket.ReceiveAsync(segment, token);
+        }
+    }
+
+    private async Task SendKeepAliveAsync(ClientWebSocket socket, CancellationToken token)
+    {
+        if (socket.State != WebSocketState.Open)
+        {
+            return;
+        }
+
+        byte[] payload = JsonSerializer.SerializeToUtf8Bytes(new { type = "ping" }, Json);
+        await _sendLock.WaitAsync(token).ConfigureAwait(false);
+        try
+        {
+            await socket.SendAsync(payload, WebSocketMessageType.Text, true, token).ConfigureAwait(false);
+        }
+        catch (Exception ex)
+        {
+            _state.LastError = ex.Message;
+        }
+        finally
+        {
+            _sendLock.Release();
         }
     }
 

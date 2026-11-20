@@ -77,7 +77,7 @@ internal static class GetFriendListInjectPatch
 internal static class GenerateDialogueListInjectPatch
 {
     [HarmonyPostfix]
-    private static void Postfix(ref List<DialogueInfo> __result)
+    private static void Postfix(MongoId sessionId, ref List<DialogueInfo> __result)
     {
         if (!DialoguePatchRuntime.Ready)
         {
@@ -101,7 +101,7 @@ internal static class GenerateDialogueListInjectPatch
                     continue;
                 }
 
-                __result.Add(DialoguePatchRuntime.Friends.BuildDialogueInfo(reference));
+                __result.Add(DialoguePatchRuntime.Friends.BuildDialogueInfo(sessionId, reference));
             }
         }
         catch (Exception ex)
@@ -119,7 +119,7 @@ internal static class GenerateDialogueViewInjectPatch
     /// 必须 Prefix 短路：虚拟 dialogId 不在 DialogueRecords 里，走原生会在 Dialogue.get_Messages 上 NRE。
     /// </summary>
     [HarmonyPrefix]
-    private static bool Prefix(GetMailDialogViewRequestData request, ref GetMailDialogViewResponseData __result)
+    private static bool Prefix(GetMailDialogViewRequestData request, MongoId sessionId, ref GetMailDialogViewResponseData __result)
     {
         if (!DialoguePatchRuntime.Ready || request == null)
         {
@@ -130,10 +130,18 @@ internal static class GenerateDialogueViewInjectPatch
         {
             if (!DialoguePatchRuntime.Friends!.TryResolve(request.DialogId, out LinkFriends.PeerRef reference))
             {
+                // 解析不到但对端是我们派生的 id（例如刚被清扫）：绝不能放给原生 ——
+                // GetDialogByIdFromProfile 会为未知 id 新建对话并写进 profile。
+                if (LinkFriends.IsOurs(request.DialogId))
+                {
+                    __result = DialoguePatchRuntime.Friends.BuildEmptyView(sessionId);
+                    return false;
+                }
+
                 return true;
             }
 
-            __result = DialoguePatchRuntime.Friends.BuildView(reference, request.Limit ?? 100);
+            __result = DialoguePatchRuntime.Friends.BuildView(sessionId, reference, request.Limit ?? 100);
             return false;
         }
         catch (Exception ex)
@@ -162,6 +170,14 @@ internal static class SendMessageToHubPatch
         {
             if (!DialoguePatchRuntime.Friends!.TryResolve(request.DialogId, out LinkFriends.PeerRef reference))
             {
+                // 解析不到但对端是我们派生的 id（例如刚被清扫）：绝不能放给原生 ——
+                // GetDialogByIdFromProfile 会为未知 id 新建对话并写进 profile。
+                if (LinkFriends.IsOurs(request.DialogId))
+                {
+                    __result = ValueTask.FromResult(string.Empty);
+                    return false;
+                }
+
                 return true;
             }
 

@@ -297,3 +297,17 @@ dotnet D:\sptEdior\SENTINELLink\Tools\SyntheticPeer\bin\Release\net10.0\Syntheti
 - 游戏内眼睛验收：主菜单好友面板点开虚拟好友、发一条、看对方（假对端）是否收到 —— 需要能登录的客户端。
 - `SendMessage` 拦截的**游戏内**验证（本次只证明了前缀补丁已挂上，未从 UI 触发）。
 - 未读数（`Dialogue.New`）目前恒 0，接 P2b 面板时再补。
+## P2a 第 2 步：真机 UI 验收 + 四处修正（2026-11-21 00:45）
+
+真机上把「好友 → 对话 → 发送」整条链走通，期间暴露四个只在客户端侧才看得见的问题，全部已修：
+
+| # | 现象 | 根因 | 修法 |
+|---|---|---|---|
+| 1 | 对话标题显示成自己（`本机实验服`），红字「你不能向这个用户发送消息」 | `BuildSelfUser` 用了**派生 id**，客户端拿真实 sessionId 认「谁是我」，两边都被当成别人 | 三方注入全部改用原生传进来的 `sessionId` |
+| 2 | 历史消息一条都不画（只有自己刚发的条） | `Message.DateTime/UtcDateTime` 写成**毫秒**，原生 `dt` 是**秒**（profile 实测 `dt=1793661128`） | `item.At / 1000`，`MessagePreview.DateTime` 同步 |
+| 3 | 标题显示 `wwe`（自己），发不出去 | 原生约定 `users[0]=对方 / users[1]=自己`（profile 实测 `turbodestroyer | wwe`），我写反了 | `Users`/`Profiles` 改 `{ 对方, 自己 }` |
+| 4 | profile 里多出一条 `23041e039769da209d161e0f` 空对话（+138 B） | `DialogueController.GetDialogByIdFromProfile` 对**未知 dialogId** 会 `new Dialogue` 并写进 `DialogueRecords`；虚拟对端刚被 Hub 清扫、缓存解析不到时漏给了原生 | ① `IsOurs(dialogId)`（尾 4 位域标记）短路，绝不放行；② 启动时清理「带域标记且 users/messages 都空」的记录 |
+
+- 关键教训：**客户端的对话数据契约必须照 profile 里的原生样本抄**（users 顺序、dt 单位、id 语义），照模型字段名猜会连错三次。
+- 实测收敛：好友列表 `路人X5` ✓ → 列表 3 条预览 ✓ → 打开能看到 3 条对方消息 ✓ → 输入「可以」发送成功，Hub `spool/peer-x5.jsonl` 收到 `{"text":"可以"}`（对方离线，排队等补投）✓ → profile `525,509 B / 23 条对话 / 虚拟 id 命中 0` ✓。
+- 产物：`SENTINEL.Link.Server.dll` **97,792 B / sha8 `0309F17B`**（`E:\EFT` 与 `E:\EFT-Fika` 两实例一致）。

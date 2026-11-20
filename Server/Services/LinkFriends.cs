@@ -84,7 +84,11 @@ public sealed class LinkFriends(LinkState state)
             _byDialog.Clear();
             _byServer.Clear();
 
-            AddPeer(state.SnapshotPeers().Select(p => (p.ServerId, p.Nickname, p.Online)));
+            // 只把**在线**对端当好友：注册过但没连 WS 的、或者刚被清扫掉的空壳不进列表，
+            // 否则好友面板会多出「探针」这种一次性连接。对方下线后靠下面的私聊历史兜底保留。
+            AddPeer(state.SnapshotPeers()
+                .Where(p => p.Online)
+                .Select(p => (p.ServerId, p.Nickname, p.Online)));
 
             // 历史私聊的发件人也要变成「好友」，否则对方下线后消息在原生面板里就消失了。
             List<(string, string, bool)> history = new();
@@ -173,12 +177,16 @@ public sealed class LinkFriends(LinkState state)
         return TryResolve(new MongoId(dialogId), out reference);
     }
 
-    /// <summary>自己这侧的身份（对话里的另一半）。</summary>
-    public UserDialogInfo BuildSelfUser()
+    /// <summary>
+    /// 自己这侧的身份（对话里的另一半）。
+    /// 必须用**真实的 sessionId**：客户端拿它和自己的 profile 对比来区分「谁是我」，
+    /// 用派生 id 会让两端都被当成别人 —— 面板标题变成自己的昵称、发消息还会被拒（不能向这个用户发送消息）。
+    /// </summary>
+    public UserDialogInfo BuildSelfUser(MongoId sessionId)
     {
         return new UserDialogInfo
         {
-            Id = string.IsNullOrEmpty(state.ServerId) ? MongoId.Empty() : DeriveDialogId(state.ServerId),
+            Id = sessionId,
             Aid = null,
             Info = new UserDialogDetails
             {
@@ -232,8 +240,9 @@ public sealed class LinkFriends(LinkState state)
             Id = DeriveMessageId(item.Id),
             UserId = mine ? selfId : reference.DialogId,
             MessageType = MessageType.UserMessage,
-            DateTime = item.At,
-            UtcDateTime = item.At,
+            // 原生 dt 是**秒**（实测 1793661128），我们的 At 是毫秒；不换算客户端不渲染历史消息。
+            DateTime = item.At / 1000,
+            UtcDateTime = item.At / 1000,
             Member = new UpdatableChatMember
             {
                 Nickname = mine ? (string.IsNullOrEmpty(state.Nickname) ? "本机" : state.Nickname) : reference.Nickname,
@@ -259,16 +268,78 @@ public sealed class LinkFriends(LinkState state)
         return new MongoId(sb.ToString());
     }
 
-    /// <summary>对话列表条目（GenerateDialogueList 的 Postfix 追加项）。</summary>
-    public DialogueInfo BuildDialogueInfo(PeerRef reference)
+    /// <summary>
+    /// 这个 id 是不是我们派生的（尾 4 位域标记）。
+    /// 用途：即使当前解析不到对端（对方被清扫、或缓存刚重建），也不能让原生接管 ——
+    /// DialogueController.GetDialogByIdFromProfile 对未知 dialogId 会**新建并写进 profile**，
+    /// 那是真正的脏写（实测会留下 `{"users":[],"messages":[],"type":1}` 的空壳记录）。
+    /// </summary>
+    public static bool IsOurs(MongoId dialogId)
     {
-        MongoId selfId = BuildSelfUser().Id;
+        string text = dialogId.ToString();
+        return text.Length == 24 && text.EndsWith(DomainTag, StringComparison.OrdinalIgnoreCase);
+    }
+
+    /// <summary>兜底的空白对话视图（虚拟 id 但解析不到对端时用）。</summary>
+    public GetMailDialogViewResponseData BuildEmptyView(MongoId sessionId)
+    {
+        return new GetMailDialogViewResponseData
+        {
+            Messages = new List<Message>(),
+            Profiles = new List<UserDialogInfo> { BuildSelfUser(sessionId) },
+            HasMessagesWithRewards = false,
+        };
+    }
+
+    /// <summary>清掉之前误写进 profile 的虚拟对话空壳（只删「id 带域标记且 users/messages 都空」的）。</summary>
+    public int PurgeStaleDialogues(IEnumerable<SptProfile> profiles, Action<string> log)
+    {
+        int removed = 0;
+        foreach (SptProfile profile in profiles)
+        {
+            Dictionary<MongoId, Dialogue>? records = profile?.DialogueRecords;
+            if (records == null || records.Count == 0)
+            {
+                continue;
+            }
+
+            List<MongoId> victims = new();
+            foreach (KeyValuePair<MongoId, Dialogue> pair in records)
+            {
+                if (!IsOurs(pair.Key))
+                {
+                    continue;
+                }
+
+                bool emptyUsers = pair.Value.Users == null || pair.Value.Users.Count == 0;
+                bool emptyMessages = pair.Value.Messages == null || pair.Value.Messages.Count == 0;
+                if (emptyUsers && emptyMessages)
+                {
+                    victims.Add(pair.Key);
+                }
+            }
+
+            foreach (MongoId victim in victims)
+            {
+                records.Remove(victim);
+                removed++;
+                log?.Invoke($"[P2a] 清理 profile 里的虚拟对话空壳：{victim}");
+            }
+        }
+
+        return removed;
+    }
+
+    /// <summary>对话列表条目（GenerateDialogueList 的 Postfix 追加项）。</summary>
+    public DialogueInfo BuildDialogueInfo(MongoId sessionId, PeerRef reference)
+    {
         List<LinkDirectMessage> messages = MessagesOf(reference);
         DialogueInfo info = new()
         {
             Id = reference.DialogId,
             Type = MessageType.UserMessage,
-            Users = new List<UserDialogInfo> { BuildSelfUser(), BuildPeerUser(reference) },
+            // 原生约定：users[0] = 对方，users[1] = 自己（实测 turbodestroyer | wwe）。顺序反了会让标题显示自己、并且发不出去。
+            Users = new List<UserDialogInfo> { BuildPeerUser(reference), BuildSelfUser(sessionId) },
             Messages = new List<Message>(),
             New = 0,
             AttachmentsNew = 0,
@@ -279,7 +350,7 @@ public sealed class LinkFriends(LinkState state)
         int from = Math.Max(0, messages.Count - 10);
         for (int i = from; i < messages.Count; i++)
         {
-            info.Messages.Add(BuildNativeMessage(reference, messages[i], selfId));
+            info.Messages.Add(BuildNativeMessage(reference, messages[i], sessionId));
         }
 
         if (messages.Count > 0)
@@ -287,9 +358,9 @@ public sealed class LinkFriends(LinkState state)
             LinkDirectMessage last = messages[^1];
             info.Message = new MessagePreview
             {
-                UserId = last.From == state.ServerId ? selfId.ToString() : reference.DialogId.ToString(),
+                UserId = last.From == state.ServerId ? sessionId.ToString() : reference.DialogId.ToString(),
                 MessageType = MessageType.UserMessage,
-                DateTime = last.At,
+                DateTime = last.At / 1000,
                 Text = last.Text,
             };
         }
@@ -298,9 +369,8 @@ public sealed class LinkFriends(LinkState state)
     }
 
     /// <summary>打开对话窗口时的完整响应（GenerateDialogueView 的 Prefix 返回值）。</summary>
-    public GetMailDialogViewResponseData BuildView(PeerRef reference, int limit)
+    public GetMailDialogViewResponseData BuildView(MongoId sessionId, PeerRef reference, int limit)
     {
-        MongoId selfId = BuildSelfUser().Id;
         List<LinkDirectMessage> messages = MessagesOf(reference);
         int take = limit > 0 ? limit : 100;
         int from = Math.Max(0, messages.Count - take);
@@ -308,13 +378,13 @@ public sealed class LinkFriends(LinkState state)
         GetMailDialogViewResponseData response = new()
         {
             Messages = new List<Message>(),
-            Profiles = new List<UserDialogInfo> { BuildSelfUser(), BuildPeerUser(reference) },
+            Profiles = new List<UserDialogInfo> { BuildPeerUser(reference), BuildSelfUser(sessionId) },
             HasMessagesWithRewards = false,
         };
 
         for (int i = from; i < messages.Count; i++)
         {
-            response.Messages.Add(BuildNativeMessage(reference, messages[i], selfId));
+            response.Messages.Add(BuildNativeMessage(reference, messages[i], sessionId));
         }
 
         return response;

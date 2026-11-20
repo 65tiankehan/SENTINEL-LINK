@@ -167,6 +167,31 @@ if (!string.IsNullOrWhiteSpace(to))
     }
 }
 
+// Hub 的 PeerTimeout 是 45 秒，空闲不发 ping 会被清扫；每 15 秒补一次心跳。
+Task keepAlive = Task.Run(async () =>
+{
+    byte[] ping = JsonSerializer.SerializeToUtf8Bytes(new { type = "ping" });
+    while (!cts.IsCancellationRequested && socket.State == WebSocketState.Open)
+    {
+        try
+        {
+            await Task.Delay(TimeSpan.FromSeconds(15), cts.Token);
+            if (socket.State == WebSocketState.Open)
+            {
+                await socket.SendAsync(ping, WebSocketMessageType.Text, true, cts.Token);
+            }
+        }
+        catch (OperationCanceledException)
+        {
+            return;
+        }
+        catch
+        {
+            return;
+        }
+    }
+});
+
 await Task.WhenAny(receiver, Task.Delay(TimeSpan.FromSeconds(listenSeconds)));
 
 try
