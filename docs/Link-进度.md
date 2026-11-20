@@ -311,3 +311,21 @@ dotnet D:\sptEdior\SENTINELLink\Tools\SyntheticPeer\bin\Release\net10.0\Syntheti
 - 关键教训：**客户端的对话数据契约必须照 profile 里的原生样本抄**（users 顺序、dt 单位、id 语义），照模型字段名猜会连错三次。
 - 实测收敛：好友列表 `路人X5` ✓ → 列表 3 条预览 ✓ → 打开能看到 3 条对方消息 ✓ → 输入「可以」发送成功，Hub `spool/peer-x5.jsonl` 收到 `{"text":"可以"}`（对方离线，排队等补投）✓ → profile `525,509 B / 23 条对话 / 虚拟 id 命中 0` ✓。
 - 产物：`SENTINEL.Link.Server.dll` **97,792 B / sha8 `0309F17B`**（`E:\EFT` 与 `E:\EFT-Fika` 两实例一致）。
+
+## P1.5 第 1 步：协议冻结（2026-11-21 01:05）
+
+把 Hub 与两端之间已经跑起来的帧，全部落成一份可依据的规范：`docs\Hub-协议.md`（新建，约 210 行）。
+
+| 内容 | 说明 |
+|---|---|
+| 冻结规则 6 条 | 只增字段不删不改 / 未知帧忽略 / 未知字段忽略 / 可选字段必须能缺 / 时间统一毫秒 / id 统一规则 |
+| 传输与认证 | `/v1/health`、`/v1/hello`（请求响应字段表 + 三种失败码）、`/v1/ws?token=`（401 纯文本）、15 s ping / 45 s 清扫 |
+| 帧目录 v1 | Hub→端 7 帧（`welcome`/`presence`/`chat`/`dm`/`dm-sync`/`ack`/`pong`）、端→Hub 3 帧（`chat`/`dm`/`ping`），逐字段列类型与含义 |
+| 边界上限表 | 聊天 512 / 私聊 1024 / 每人队列 500 / 保留 168 h / 超时 45 s / 清扫 10 s / 单域 64 |
+| 状态机 | 未注册 → 已注册 → 在线；断线退避 2→4→8→16→30 s；token 失效走 401 重新 hello |
+| 派生 id 铁律 | 虚拟对话/消息 id = sha256 前 20 hex + `1e0f`；并写明「GetDialogByIdFromProfile 对未知 dialogId 会写档」这个 P2a 踩过的坑 |
+| 扩展流程 6 步 | 先改文档 → 新增 case 不改老分支 → 收端 default 忽略 → 缺字段按默认值 → 同提交更进度 → 跑回归 |
+| 回归清单 | Hub 起 / 假对端在线直投对账 / 离线 100 条补投，验收看 `dmQueued` 归零与「对账 OK」 |
+
+- 文档里的每条错误文案都与 `Hub\Program.cs` / `PeerRegistry.cs` 的实际字符串逐字对过（`邀请码错误` / `serverId 不能为空` / `realm <域> 已满（上限 N）` / `缺少收件人或正文`）。
+- 本次只写文档，**没有改代码**：v1 靠字段集识别，未加显式 `proto` 字段；真要协商版本时按扩展流程加，旧端会当未知字段忽略。
