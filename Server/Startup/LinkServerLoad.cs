@@ -10,6 +10,7 @@ using SentinelLink.Shared;
 using SPTarkov.Common.Models.Logging;
 using SPTarkov.DI.Annotations;
 using SPTarkov.Server.Core.DI;
+using SPTarkov.Server.Core.Models.Common;
 
 namespace SentinelLink.Server.Startup;
 
@@ -116,6 +117,7 @@ public sealed class LinkServerLoad(
             if (DialoguePatchRuntime.Active)
             {
                 logger.Success("[P2a] 原生好友/私聊注入已启用（4/4）；虚拟 id 域标记 = " + LinkFriends.DomainTag);
+                LogWorldChannels(friends);
             }
             else
             {
@@ -126,6 +128,29 @@ public sealed class LinkServerLoad(
         {
             DialoguePatchRuntime.Active = false;
             logger.Error("[P2a] Harmony 初始化失败，已降级：" + ex.Message);
+        }
+    }
+
+    /// <summary>
+    /// P2b：把三个世界频道的派生 id 打出来 —— 同一 realm 的两个实例必须得到同一组 id，
+    /// 否则各自造会话就互相看不见（这是唯一肉眼可查的跨服前提）。
+    /// </summary>
+    private void LogWorldChannels(LinkFriends friends)
+    {
+        try
+        {
+            foreach (string channel in LinkFriends.WorldChannels)
+            {
+                MongoId id = friends.WorldDialogId(channel);
+                bool roundTrip = friends.TryResolveWorld(id, out string back)
+                                 && string.Equals(back, channel, StringComparison.Ordinal);
+                logger.Info("[P2b] 世界频道 " + channel + "（" + LinkFriends.WorldChannelName(channel) + "）→ " + id
+                            + (roundTrip ? " 反解OK" : " 反解失败"));
+            }
+        }
+        catch (Exception ex)
+        {
+            logger.Warning("[P2b] 世界频道 id 打印失败（不影响运行）：" + ex.Message);
         }
     }
 

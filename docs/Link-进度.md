@@ -2,16 +2,15 @@
 
 > 一条一次，带数字。发版前把关键条目挪进计划书。
 ## 当前状态（2026-11-21 01:03，随提交更新）
-## 当前状态（2026-11-21 01:0x，随提交更新）
 
 | 阶段 | 状态 | 提交 | 关键数字 |
 |---|---|---|---|
 | P0 骨架 | ✅ | `3bbfff2` | Hub health/hello/ws 通，四跳对账 OK |
 | P1 世界聊天面板 | ✅ | `25ca19c` `93058de` `d36eb00` | 面板实收 10 条；宿主挂 `BaseUnityPlugin`；F11/Ctrl+L |
-| P1.5 协议冻结 | ✅ | `55abcd5` | `docs\Hub-协议.md` 252 行，10 类帧 |
+| P1.5 协议冻结 | ✅ | `55abcd5` | `docs\Hub-协议.md` 282 行，12 类帧 |
 | P2b-1 Hub 私聊 + 落盘队列 | ✅ | `de4a7a3` | 离线 100/100 对账，重启不丢 |
 | P2a 原生好友 + 私聊 | ✅ | `158344d` `32a5c61` | 好友 +1 / 对话 +1 / 消息 3~4；profile 字节差 0 |
-| P2b-2 世界频道 + 局内入口 | ⬜ 下一步 | — | 方案 B2（服务端造 `GlobalChat` 会话） |
+| P2b-2 世界频道 + 局内入口 | 🟡 世界频道已通，缺局内入口 | 见下节 | 原生窗 3 频道注入 +1 历史补投；profile 脏写 0 |
 
 **未验清单**
 
@@ -365,3 +364,34 @@ dotnet D:\sptEdior\SENTINELLink\Tools\SyntheticPeer\bin\Release\net10.0\Syntheti
 
 - 世界频道结论：neko **复用客户端原生聊天列表**（造 `type=9 GlobalChat` 的 pinned 会话 + `DisplayMessage` 塞消息），不重画 UI；我们 4.1.6 的 public API 反而更干净（`DisplayMessage` 是公开方法，neko 那段 `SafeDisplay` 反编译不出来）。
 - 下一步仍按 B2：服务端虚拟 `world` 会话，复用 P2a 的四个补丁；实现前先把每个模块的细节按需再深挖（这次只到「能判断可行性 + 能估工」的深度）。
+
+## P2b-2 第 1 步 · 世界频道走原生聊天窗（B2，2026-11-21 01:20）
+
+方案选择：**服务端造虚拟 `GlobalChat` 会话**（复用 P2a 的 id 派生与 Prefix 短路），客户端零 UI —— 不照 neko 在客户端伪造会话，少一半打点。
+
+| 层 | 改动 |
+|---|---|
+| Hub | 新增 `Hub\Services\WorldLog.cs`（每 realm 每频道环形 100 条）；`world` / `world-sync` 两帧；`HubOptions.MaxWorldLength=512`、`SENTINEL_HUB_WORLD_HISTORY`；连上后先补历史再补私聊 |
+| 服务端 | `LinkState.AddWorld/SnapshotWorld`（环形 200）；`LinkFriends` 增三频道 id 派生（`sha256("sentinel.link.world:"+realm+":"+channel)` 前 20 hex + `1e0f`）+ `BuildWorldUser/BuildWorldNativeMessage/BuildWorldDialogueInfo/BuildWorldView`；`DialoguePatches` 三处补丁各加世界分支（列表追加 / View 短路 / 发送转 Hub）；路由 `/world/send`、`/world/state` |
+| 启动 | `LinkServerLoad` 打出三个频道 id 并做反解自检 |
+| 工具 | `SyntheticPeer` 增 `--world <channel>`、`--world-expect <n>`，并统计收到的 `world` 帧数 |
+
+实测（Hub 5180 + `SENTINEL.Hub` + `SPT.Server` 6969 + 假对端）：
+
+| 场景 | 结果 |
+|---|---|
+| 在线广播 | `peer-w2` 向 `trade` 连发 3 条 → 3 条 `ack{delivered:true}`；旁听 `peer-w1` 收 3 条 `world` |
+| 历史补投 | 晚连的 `peer-w4` 收到 `world-sync{world:2}` + 2 条 `replayed`、`world-sync{trade:3}` + 3 条 `replayed`，共 5 条 |
+| 服务端加载 | `[P2b] 世界频道 world → 9e4a7a209dc0ae832cf41e0f 反解OK`、`trade → 3bb25dadb43573a623881e0f`、`lfg → eb4d5f229226f0d500f71e0f`（均 24 位、尾 `1e0f`） |
+| 原生注入 | `/sentinelink/client/p2a/state`：`worldInjected=3`、`dialoguesTotal=26`（23 真实 + 3 频道）、`worldViewMessages=2`、`worldViewProfiles=2` |
+| 历史进链路 | `/sentinelink/client/world/state` 返回 2 条（`from=peer-w3`，`replayed=true`） |
+| 存档 | profile `6ae7b434…` 无任何 `*1e0f` 键（脏写 0）；新出现的 0 消息对话 `6723fd51c5924c57ce0ca01e`（Commando，aid 2999998）不带域标记，是 SPT 自己建的 |
+
+构建：Hub / Server / SyntheticPeer **0 警告 0 错误**；`SENTINEL.Link.Server.dll` 111,616 B、sha8 `9270fb7b`，已刷 `E:\EFT` 与 `E:\EFT-Fika`。
+
+两个坑：
+
+1. 用“按行插入到某方法之前”改 `LinkCallbacks.cs` 时插在 `SendDirect` 的**签名行**上，把参数表劈开 → 后续插入要选「方法整体之后」的锚点（这里用 `DirectState`），或先 `git checkout` 复原再重插。
+2. PowerShell 里多行字符串数组写 C# 片段，`'                },'` 这类行会因引号/括号组合被解析器判成语法错 → 改用 `@'…'@` here-string 再 `-split "`r?`n"`。
+
+还没做：①局内入口（背包界面塞一个聊天按钮，原生局内没有）；②客户端面板加「世界」页签（现在只有原生窗）；③两个真实实例跨服验（只用假对端验过）。

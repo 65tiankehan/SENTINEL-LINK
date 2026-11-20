@@ -131,6 +131,28 @@
 
 顺序保证：`welcome` → `dm-sync`（仅当有积压）→ N 条 `dm`。
 
+#### `world`（世界频道消息，P2b）
+
+| 字段 | 类型 | 说明 |
+|---|---|---|
+| `id` | string | 16 hex |
+| `channel` | string | `world` / `trade` / `lfg`（Hub 会把非法值归一成 `world`） |
+| `from` | string | 发送方 serverId |
+| `fromNick` | string | 发送方显示名 |
+| `text` | string | 正文（≤512） |
+| `at` | long | 毫秒 |
+| `replayed` | bool | `true` = 上线时补发的历史 |
+
+#### `world-sync`（历史补投前导帧，每频道一条）
+
+| 字段 | 类型 | 说明 |
+|---|---|---|
+| `channel` | string | 该频道紧接着会补几条 |
+| `count` | int | 补发条数 |
+| `at` | long | 毫秒 |
+
+顺序保证：`welcome` → `world-sync`+`world(replayed)`（按频道序）→ `dm-sync`+`dm`。
+
 #### `ack`（对 chat / dm 的回执，只回发送方）
 
 | 字段 | 类型 | 说明 |
@@ -160,6 +182,10 @@
 - 否则 → 落盘 `spool/<realm>/<serverId>.jsonl` + `ack{delivered:false,queued:true,pending}`
 - `to` 或 `text` 为空 → `ack{delivered:false,error:"缺少收件人或正文"}`
 
+#### `world`
+
+`{ "type": "world", "channel": "trade", "text": "..." }` → 广播 `world` 给同 realm 其他实例（**不回显给发送方**）+ 回 `ack{forType:"world",id,delivered:true,channel}`。
+
 #### `ping`
 
 `{ "type": "ping" }` → `pong`。**每 15 秒必须发**，否则 45 秒后被清扫。
@@ -174,6 +200,8 @@
 |---|---|---|
 | 聊天正文上限 | 512 字符（超出截断） | `HubOptions.MaxChatLength` |
 | 私聊正文上限 | 1024 字符（超出截断） | `HubOptions.MaxDirectLength` |
+| 世界频道正文上限 | 512 字符（超出截断；`channel` 非法归一成 `world`） | `HubOptions.MaxWorldLength` |
+| 世界频道历史 | 每 realm 每频道 **100 条**（环形，Hub 内存） | `SENTINEL_HUB_WORLD_HISTORY` |
 | 每人离线队列 | 500 条（超出丢最旧） | `SENTINEL_HUB_DM_LIMIT` |
 | 离线保留 | 168 小时（过期不投） | `HubOptions.DirectTtl` |
 | 掉线判定 | 45 秒无帧 | `HubOptions.PeerTimeout` |
@@ -203,6 +231,8 @@
 |---|---|---|---|---|
 | `welcome` / `presence` / `chat` / `dm` / `dm-sync` / `ack` / `pong` | ✔ | — | ✔ | ✔ |
 | `chat` / `dm` / `ping` | — | ✔ | ✔（发） | ✔（发） |
+| `world` / `world-sync` | ✔ | — | ✔ | ✔ |
+| `world` | — | ✔ | ✔（发） | ✔（发） |
 
 ## 6. 派生 id（写给 EFT 原生面板的那一层）
 

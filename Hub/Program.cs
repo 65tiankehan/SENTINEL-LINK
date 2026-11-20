@@ -12,13 +12,14 @@ using SentinelLink.Shared;
 // 转发（realm 内广播）。业务语义（聊天记录、好友关系、报价同步）一律在设计上
 // 留在各 SPT 服务端，Hub 只做「谁在线、帮我把这条帧送到同域的其他人」。
 //
-// 这一层刻意不落盘：Hub 重启 = 全体掉线重连，由每个 SPT 服务端在加载时自动补连，
-// 因此不需要任何持久化设施。
+// 唯一例外是世界频道：它是「同域所有人可见」的语义，只有 Hub 同时看见所有实例，
+// 所以在 Hub 内存里留一份每频道环形历史（WorldLog），晚进来的实例能补到最近 100 条。
 // ─────────────────────────────────────────────────────────────────────────────
 
 HubOptions options = new();
 PeerRegistry registry = new(options);
 DirectSpool spool = new(options.SpoolDirectory, options.DirectQueueLimit, options.DirectTtl);
+WorldLog worldLog = new(options.WorldHistoryLimit);
 
 WebApplicationBuilder builder = WebApplication.CreateBuilder();
 builder.WebHost.UseUrls($"http://0.0.0.0:{options.Port}");
@@ -124,6 +125,41 @@ app.Map("/v1/ws", async (HttpContext context) =>
         at = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()
     });
 
+
+    // 补世界频道历史：三个频道各补最近 WorldHistoryLimit 条，客户端按频道分开画。
+    foreach (string channel in new[] { "world", "trade", "lfg" })
+    {
+        List<WorldRecord> recent = worldLog.Recent(peer.Realm, channel, options.WorldHistoryLimit);
+        if (recent.Count == 0)
+        {
+            continue;
+        }
+
+        await registry.SendAsync(peer, new
+        {
+            type = "world-sync",
+            channel,
+            count = recent.Count,
+            at = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()
+        });
+
+        foreach (WorldRecord record in recent)
+        {
+            await registry.SendAsync(peer, new
+            {
+                type = "world",
+                id = record.Id,
+                channel = record.Channel,
+                from = record.From,
+                fromNick = record.FromNick,
+                text = record.Text,
+                at = record.At,
+                replayed = true
+            });
+        }
+
+        Console.WriteLine($"  [{DateTime.Now:HH:mm:ss}] 补世界频道 {channel} 历史 {recent.Count} 条 → {peer.ServerId}");
+    }
     // 补投离线私聊：连上就把队列读走（读后即删），每条都是正式投递而不是「重放通知」
     List<DirectRecord> backlog = spool.Drain(peer.Realm, peer.ServerId);
     if (backlog.Count > 0)
@@ -338,6 +374,55 @@ app.Map("/v1/ws", async (HttpContext context) =>
                     });
                 }
 
+                break;
+
+            case "world":
+                string worldChannel = root.TryGetProperty("channel", out JsonElement chElement)
+                    ? (chElement.GetString() ?? "world").Trim().ToLowerInvariant()
+                    : "world";
+                if (worldChannel != "world" && worldChannel != "trade" && worldChannel != "lfg")
+                {
+                    worldChannel = "world";
+                }
+
+                string worldBody = root.TryGetProperty("text", out JsonElement worldText)
+                    ? (worldText.GetString() ?? string.Empty).Trim()
+                    : string.Empty;
+                if (worldBody.Length == 0)
+                {
+                    break;
+                }
+
+                if (worldBody.Length > options.MaxWorldLength)
+                {
+                    worldBody = worldBody.Substring(0, options.MaxWorldLength);
+                }
+
+                WorldRecord worldRecord = worldLog.NewRecord(sender.Realm, worldChannel, sender.ServerId, sender.Nickname, worldBody);
+                worldLog.Append(worldRecord);
+
+                // world 和 chat 的区别只有一个：Hub 记历史。广播语义完全一样（同域、不回给发送方）。
+                await registry.BroadcastAsync(sender.Realm, new
+                {
+                    type = "world",
+                    id = worldRecord.Id,
+                    channel = worldChannel,
+                    from = sender.ServerId,
+                    fromNick = sender.Nickname,
+                    text = worldRecord.Text,
+                    at = worldRecord.At,
+                    replayed = false
+                }, excludeServerId: sender.ServerId);
+
+                await registry.SendAsync(sender, new
+                {
+                    type = "ack",
+                    forType = "world",
+                    id = worldRecord.Id,
+                    delivered = true,
+                    channel = worldChannel,
+                    at = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()
+                });
                 break;
 
             default:

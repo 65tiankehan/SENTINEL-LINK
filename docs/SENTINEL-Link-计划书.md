@@ -70,7 +70,7 @@
 | **P1 世界聊天** | 服务端转发 + 客户端聊天面板（复用 Min 绘制层）+ 输入锁 | P0 | 面板实收 10 条对端消息；`chat` 帧不丢；重连退避 2→30 s | ✅ 已交付 `25ca19c` / `93058de` / `d36eb00` |
 | **P1.5 协议冻结** | 把 `hello / welcome / presence / chat / ack / dm / dm-sync / ping` 写成 `docs\Hub-协议.md`：字段表、语义、向后兼容规则（未知帧必须忽略） | P1 | 文档含 8 类帧；旧客户端连新 Hub 不崩；Hub 侧只增字段不删字段 | ✅ 已交付 `55abcd5`（250 行 / 11,170 B） |
 | **P2a 原生好友 + 私聊** | 服务端 patch `DialogueController`：`GetFriendList` / `GenerateDialogueList` / `GenerateDialogueView` / `SendMessage`，把跨服好友与消息「造」进原生好友面板与私聊窗口；**跨服消息只走 `LinkState` + Hub，不写 profile** | P2b-1 Hub 私聊通道（已交付 `de4a7a3`）+ P1.5 | 原生好友 +1、对话 +1、点开取到 3~4 条消息 + 2 个 profiles（实测）；离线 100 条补投 0 丢失；**存档不脏写**：profile 字节差 0（525,509 B 前后一致）、虚拟 id 命中 0 | ✅ 已交付 `158344d` / `32a5c61` |
-| **P2b 世界频道 + 局内入口** | ①**世界频道走原生聊天窗**（照 neko 的 B2 方案：服务端造 `GlobalChat` 虚拟会话，客户端零 UI 或极小补丁）；②局内入口（`InventoryScreen.Show` Postfix 注入按钮）；③自建面板降级为诊断 + 备用 | P1 + P2a 的注入面 | 世界频道与私聊互不串台；原生窗收 10 条 / 发 10 条；`ChatSendDelegate` 单槽被抢时降级不崩；局内按钮点开可发 | 🟡 Hub 私聊通道已交付（`de4a7a3`）；世界频道 + 局内入口待做（**下一步**） |
+| **P2b 世界频道 + 局内入口** | ①**世界频道走原生聊天窗**（B2：服务端造 `GlobalChat` 虚拟会话，客户端零 UI）；②局内入口（`InventoryScreen.Show` Postfix 注入按钮）；③自建面板降级为诊断 + 备用 | P1 + P2a 的注入面 | 世界频道与私聊互不串台；原生窗收 10 条 / 发 10 条；`ChatSendDelegate` 单槽被抢时降级不崩；局内按钮点开可发 | 🟡 ①世界频道已通（3 频道注入 + 历史补投 + profile 脏写 0）；②局内入口待做 |
 | **P3 跳蚤远程报价** | `RagfairOfferHolder` 注入 + 幂等表（Remote/Pushed/OfferOwners）+ 模板校验 + 结算 | **P1.5**（不再依赖 P2 的 UI） | 报价同步 ≤ 300 条上限不超；`requireLocalItemTemplates` 命中 0 崩；同一报价重复推送 0 次 | ⬜ |
 | **P4 局内空投** | WS 下发 + 客户端落点/拾取 + TTL 600 s | P3 + P2b 通道 | 投递成功率 ≥ 95%；TTL 600 s 归**服务端定时器**（Hub 只转帧不存，重启不背锅）；TTL 到期回收 0 残骸 | ⬜ |
 | **P5 组队 / 跨局** | 二选一：① 接 Fika（省力，受制于人）② 自研轻量同步（共享标记/观战，不搬网络栈） | P4 | 决策点，届时再定 | ⬜ |

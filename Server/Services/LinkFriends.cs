@@ -389,4 +389,167 @@ public sealed class LinkFriends(LinkState state)
 
         return response;
     }
+
+    // ── 世界频道（P2b）：三个固定频道，id 由 realm + channel 派生 ──────────────
+
+    /// <summary>世界频道 id 表：world=世界 / trade=交易 / lfg=求组。</summary>
+    public static readonly string[] WorldChannels = { "world", "trade", "lfg" };
+
+    public static string WorldChannelName(string channel)
+    {
+        return channel switch
+        {
+            "trade" => "交易",
+            "lfg" => "求组",
+            _ => "世界",
+        };
+    }
+
+    /// <summary>同一 realm 的所有实例必须推出同一个 id，否则各自造会话就看不到彼此。</summary>
+    public static MongoId DeriveWorldDialogId(string realm, string channel)
+    {
+        string seed = "sentinel.link.world:" + (string.IsNullOrEmpty(realm) ? "default" : realm)
+                      + ":" + (string.IsNullOrEmpty(channel) ? "world" : channel);
+        byte[] hash = SHA256.HashData(Encoding.UTF8.GetBytes(seed));
+        StringBuilder sb = new(24);
+        for (int i = 0; i < 10; i++)
+        {
+            sb.Append(hash[i].ToString("x2"));
+        }
+
+        sb.Append(DomainTag);
+        return new MongoId(sb.ToString());
+    }
+
+    public MongoId WorldDialogId(string channel)
+    {
+        return DeriveWorldDialogId(state.Realm, channel);
+    }
+
+    /// <summary>判断某个虚拟 id 是不是三个世界频道之一。</summary>
+    public bool TryResolveWorld(MongoId dialogId, out string channel)
+    {
+        channel = "";
+        if (!IsOurs(dialogId))
+        {
+            return false;
+        }
+
+        foreach (string candidate in WorldChannels)
+        {
+            if (DeriveWorldDialogId(state.Realm, candidate) == dialogId)
+            {
+                channel = candidate;
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    public bool TryResolveWorld(string dialogId, out string channel)
+    {
+        channel = "";
+        return MongoId.IsValidMongoId(dialogId) && TryResolveWorld(new MongoId(dialogId), out channel);
+    }
+
+    /// <summary>频道自己的「用户」条目 —— 对话列表里 users[0] 的位置，标题就取它的昵称。</summary>
+    public UserDialogInfo BuildWorldUser(string channel)
+    {
+        return new UserDialogInfo
+        {
+            Id = WorldDialogId(channel),
+            Aid = 1_000_000,
+            Info = new UserDialogDetails
+            {
+                Nickname = WorldChannelName(channel),
+                Side = "Usec",
+                Level = 1,
+                MemberCategory = 0,
+                SelectedMemberCategory = 0,
+            },
+        };
+    }
+
+    public Message BuildWorldNativeMessage(string channel, LinkWorldMessage item, MongoId selfId)
+    {
+        bool mine = item.From == state.ServerId;
+        return new Message
+        {
+            Id = DeriveMessageId("world:" + channel + ":" + item.Id),
+            UserId = mine ? selfId : WorldDialogId(channel),
+            MessageType = MessageType.GlobalChat,
+            DateTime = item.At / 1000,
+            UtcDateTime = item.At / 1000,
+            Member = new UpdatableChatMember
+            {
+                Nickname = mine
+                    ? (string.IsNullOrEmpty(state.Nickname) ? "本机" : state.Nickname)
+                    : (string.IsNullOrEmpty(item.FromNick) ? "某处" : item.FromNick),
+                Side = "Usec",
+                Level = 1,
+            },
+            Text = item.Text,
+            HasRewards = false,
+            RewardCollected = false,
+        };
+    }
+
+    /// <summary>对话列表里的世界频道条目（GenerateDialogueList 的 Postfix 追加项）。</summary>
+    public DialogueInfo BuildWorldDialogueInfo(MongoId sessionId, string channel)
+    {
+        List<LinkWorldMessage> messages = state.SnapshotWorld(channel, 0);
+        DialogueInfo info = new()
+        {
+            Id = WorldDialogId(channel),
+            Type = MessageType.GlobalChat,
+            Users = new List<UserDialogInfo> { BuildWorldUser(channel), BuildSelfUser(sessionId) },
+            Messages = new List<Message>(),
+            New = 0,
+            AttachmentsNew = 0,
+            Pinned = true,
+        };
+
+        int from = Math.Max(0, messages.Count - 10);
+        for (int i = from; i < messages.Count; i++)
+        {
+            info.Messages.Add(BuildWorldNativeMessage(channel, messages[i], sessionId));
+        }
+
+        if (messages.Count > 0)
+        {
+            LinkWorldMessage last = messages[^1];
+            info.Message = new MessagePreview
+            {
+                UserId = last.From == state.ServerId ? sessionId.ToString() : WorldDialogId(channel).ToString(),
+                MessageType = MessageType.GlobalChat,
+                DateTime = last.At / 1000,
+                Text = last.Text,
+            };
+        }
+
+        return info;
+    }
+
+    /// <summary>打开世界频道时的完整响应（GenerateDialogueView 的 Prefix 返回值）。</summary>
+    public GetMailDialogViewResponseData BuildWorldView(MongoId sessionId, string channel, int limit)
+    {
+        List<LinkWorldMessage> messages = state.SnapshotWorld(channel, 0);
+        int take = limit > 0 ? limit : 100;
+        int from = Math.Max(0, messages.Count - take);
+
+        GetMailDialogViewResponseData response = new()
+        {
+            Messages = new List<Message>(),
+            Profiles = new List<UserDialogInfo> { BuildWorldUser(channel), BuildSelfUser(sessionId) },
+            HasMessagesWithRewards = false,
+        };
+
+        for (int i = from; i < messages.Count; i++)
+        {
+            response.Messages.Add(BuildWorldNativeMessage(channel, messages[i], sessionId));
+        }
+
+        return response;
+    }
 }

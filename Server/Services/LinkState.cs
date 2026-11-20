@@ -16,6 +16,7 @@ public sealed class LinkState
     private readonly object _sync = new();
     private readonly List<LinkChatMessage> _chat = new();
     private readonly List<LinkDirectMessage> _direct = new();
+    private readonly List<LinkWorldMessage> _world = new();
     private readonly Dictionary<string, LinkPeerInfo> _peers = new();
 
     /// <summary>聊天历史保留条数（P1 做界面时按这个上限滚）。</summary>
@@ -23,6 +24,9 @@ public sealed class LinkState
 
     /// <summary>私聊历史保留条数（P2）。</summary>
     public const int DirectHistoryLimit = 200;
+
+    /// <summary>世界频道每频道保留条数（P2b）。</summary>
+    public const int WorldHistoryLimit = 200;
 
     private int _unread;
     private int _syncBatches;
@@ -209,6 +213,45 @@ public sealed class LinkState
             {
                 return _lastSyncCount;
             }
+        }
+    }
+
+    /// <summary>收下一条世界频道消息（含历史补投）。</summary>
+    public void AddWorld(LinkWorldMessage message)
+    {
+        lock (_sync)
+        {
+            _world.Add(message);
+            if (_world.Count > WorldHistoryLimit)
+            {
+                _world.RemoveRange(0, _world.Count - WorldHistoryLimit);
+            }
+        }
+    }
+
+    /// <summary>按频道取历史；channel 传空表示全部频道。</summary>
+    public List<LinkWorldMessage> SnapshotWorld(string channel, long sinceMs)
+    {
+        lock (_sync)
+        {
+            List<LinkWorldMessage> result = new();
+            foreach (LinkWorldMessage item in _world)
+            {
+                if (item.At < sinceMs)
+                {
+                    continue;
+                }
+
+                if (!string.IsNullOrEmpty(channel) &&
+                    !string.Equals(item.Channel, channel, StringComparison.Ordinal))
+                {
+                    continue;
+                }
+
+                result.Add(item);
+            }
+
+            return result;
         }
     }
 }

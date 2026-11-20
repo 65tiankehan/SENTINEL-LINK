@@ -281,6 +281,58 @@ public sealed record LinkP2aStateResponse
     [JsonPropertyName("viewProfiles")]
     public int ViewProfiles { get; init; }
 
+    /// <summary>P2b：三个世界频道里，有几个真的出现在 GenerateDialogueList 的返回值里。</summary>
+    [JsonPropertyName("worldInjected")]
+    public int WorldInjected { get; init; }
+
+    [JsonPropertyName("worldViewMessages")]
+    public int WorldViewMessages { get; init; }
+
+    [JsonPropertyName("worldViewProfiles")]
+    public int WorldViewProfiles { get; init; }
+
     [JsonPropertyName("error")]
     public string Error { get; init; } = "";
+}
+
+/// <summary>一条世界频道消息（world / trade / lfg）。</summary>
+public sealed class LinkWorldMessage
+{
+    [JsonPropertyName("id")] public string Id { get; init; } = "";
+    [JsonPropertyName("channel")] public string Channel { get; init; } = "world";
+    [JsonPropertyName("from")] public string From { get; init; } = "";
+    [JsonPropertyName("fromNick")] public string FromNick { get; init; } = "";
+    [JsonPropertyName("text")] public string Text { get; init; } = "";
+    [JsonPropertyName("at")] public long At { get; init; }
+    [JsonPropertyName("replayed")] public bool Replayed { get; init; }
+}
+
+public sealed class LinkWorldSendRequest : SPTarkov.Server.Core.Models.Utils.IRequestData
+{
+    [JsonPropertyName("channel")] public string Channel { get; set; } = "world";
+    [JsonPropertyName("text")] public string Text { get; set; } = "";
+}
+
+public sealed class LinkWorldSendResponse
+{
+    [JsonPropertyName("ok")] public bool Ok { get; init; }
+    [JsonPropertyName("delivered")] public bool Delivered { get; init; }
+    [JsonPropertyName("hubState")] public string HubState { get; init; } = "";
+    [JsonPropertyName("channel")] public string Channel { get; init; } = "";
+    [JsonPropertyName("error")] public string Error { get; init; } = "";
+}
+
+public sealed class LinkWorldStateRequest : SPTarkov.Server.Core.Models.Utils.IRequestData
+{
+    [JsonPropertyName("channel")] public string Channel { get; set; } = "";
+    [JsonPropertyName("sinceMs")] public long SinceMs { get; set; }
+}
+
+public sealed class LinkWorldStateResponse
+{
+    [JsonPropertyName("hubState")] public string HubState { get; init; } = "";
+    [JsonPropertyName("realm")] public string Realm { get; init; } = "";
+    [JsonPropertyName("channels")] public IReadOnlyList<string> Channels { get; init; } = new List<string>();
+    [JsonPropertyName("messages")] public IReadOnlyList<LinkWorldMessage> Messages { get; init; } = new List<LinkWorldMessage>();
+    [JsonPropertyName("serverTime")] public long ServerTime { get; init; }
 }

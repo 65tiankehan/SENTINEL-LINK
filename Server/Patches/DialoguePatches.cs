@@ -103,6 +103,18 @@ internal static class GenerateDialogueListInjectPatch
 
                 __result.Add(DialoguePatchRuntime.Friends.BuildDialogueInfo(sessionId, reference));
             }
+
+            // 世界频道（P2b）：三个固定频道，永远在列表里（原生没有就造一个，服务端各自造、id 一致）。
+            foreach (string channel in LinkFriends.WorldChannels)
+            {
+                string worldId = DialoguePatchRuntime.Friends.WorldDialogId(channel).ToString();
+                if (existing.Contains(worldId))
+                {
+                    continue;
+                }
+
+                __result.Add(DialoguePatchRuntime.Friends.BuildWorldDialogueInfo(sessionId, channel));
+            }
         }
         catch (Exception ex)
         {
@@ -128,6 +140,14 @@ internal static class GenerateDialogueViewInjectPatch
 
         try
         {
+            // 世界频道先判：同样是虚拟 id，但不在好友表里，走 BuildWorldView。
+            if (DialoguePatchRuntime.Friends!.TryResolveWorld(request.DialogId, out string worldChannel))
+            {
+                __result = DialoguePatchRuntime.Friends.BuildWorldView(
+                    sessionId, worldChannel, request.Limit ?? 100);
+                return false;
+            }
+
             if (!DialoguePatchRuntime.Friends!.TryResolve(request.DialogId, out LinkFriends.PeerRef reference))
             {
                 // 解析不到但对端是我们派生的 id（例如刚被清扫）：绝不能放给原生 ——
@@ -168,6 +188,40 @@ internal static class SendMessageToHubPatch
 
         try
         {
+            // 世界频道：转 Hub 的 world 帧（Hub 记历史并广播），本地先记一份让原生窗立刻可见。
+            if (DialoguePatchRuntime.Friends!.TryResolveWorld(request.DialogId, out string worldChannel))
+            {
+                string worldText = request.Text ?? "";
+                if (worldText.Length == 0)
+                {
+                    __result = ValueTask.FromResult(string.Empty);
+                    return false;
+                }
+
+                LinkHubClient? worldHub = DialoguePatchRuntime.Hub;
+                LinkState? worldState = DialoguePatchRuntime.State;
+                if (worldHub == null || worldState == null)
+                {
+                    __result = ValueTask.FromResult(string.Empty);
+                    return false;
+                }
+
+                worldState.AddWorld(new LinkWorldMessage
+                {
+                    Id = Guid.NewGuid().ToString("N")[..16],
+                    Channel = worldChannel,
+                    From = worldState.ServerId,
+                    FromNick = worldState.Nickname,
+                    Text = worldText,
+                    At = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds(),
+                    Replayed = false,
+                });
+
+                _ = worldHub.SendWorldAsync(worldChannel, worldText, default);
+                __result = ValueTask.FromResult(string.Empty);
+                return false;
+            }
+
             if (!DialoguePatchRuntime.Friends!.TryResolve(request.DialogId, out LinkFriends.PeerRef reference))
             {
                 // 解析不到但对端是我们派生的 id（例如刚被清扫）：绝不能放给原生 ——

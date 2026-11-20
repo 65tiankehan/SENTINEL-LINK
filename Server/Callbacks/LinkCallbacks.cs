@@ -171,6 +171,71 @@ public sealed class LinkCallbacks(
         return httpResponse.NoBody(response);
     }
 
+    /// <summary>发一条世界频道消息（world / trade / lfg）。</summary>
+    public async ValueTask<string> SendWorld(
+        string url,
+        LinkWorldSendRequest request,
+        MongoId sessionId)
+    {
+        string channel = (request.Channel ?? "world").Trim().ToLowerInvariant();
+        if (Array.IndexOf(LinkFriends.WorldChannels, channel) < 0)
+        {
+            channel = "world";
+        }
+
+        string text = (request.Text ?? "").Trim();
+        if (text.Length == 0)
+        {
+            return httpResponse.NoBody(new LinkWorldSendResponse
+            {
+                Ok = false,
+                HubState = state.HubState,
+                Channel = channel,
+                Error = "文本为空"
+            });
+        }
+
+        bool sent = await hub.SendWorldAsync(channel, text, CancellationToken.None).ConfigureAwait(false);
+
+        // 本地也记一份：Hub 不回显给发送方，原生窗与面板都读 LinkState。
+        state.AddWorld(new LinkWorldMessage
+        {
+            Id = Guid.NewGuid().ToString("N")[..16],
+            Channel = channel,
+            From = state.ServerId,
+            FromNick = state.Nickname,
+            Text = text,
+            At = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds(),
+            Replayed = false,
+        });
+
+        return httpResponse.NoBody(new LinkWorldSendResponse
+        {
+            Ok = sent,
+            Delivered = sent,
+            HubState = state.HubState,
+            Channel = channel,
+            Error = sent ? "" : "Hub 未连接"
+        });
+    }
+
+    /// <summary>读世界频道历史（诊断/面板用；原生窗走 GenerateDialogueView）。</summary>
+    public ValueTask<string> WorldState(
+        string url,
+        LinkWorldStateRequest request,
+        MongoId sessionId)
+    {
+        string channel = (request.Channel ?? "").Trim().ToLowerInvariant();
+        return new ValueTask<string>(httpResponse.NoBody(new LinkWorldStateResponse
+        {
+            HubState = state.HubState,
+            Realm = state.Realm,
+            Channels = LinkFriends.WorldChannels,
+            Messages = state.SnapshotWorld(channel, request.SinceMs),
+            ServerTime = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()
+        }));
+    }
+
     /// <summary>拉私聊增量；markRead=true 时顺手把未读清零。</summary>
     public ValueTask<string> DirectState(
         string url,
@@ -273,6 +338,45 @@ public sealed class LinkCallbacks(
                 };
             }
 
+            // P2b：三个世界频道应当永远在列表里（原生没有，由我们的 Postfix 追加）
+            int worldInjected = 0;
+            string worldSample = "";
+            if (dialogues != null)
+            {
+                foreach (string channel in LinkFriends.WorldChannels)
+                {
+                    string worldId = friends.WorldDialogId(channel).ToString();
+                    if (dialogues.Exists(item => item.Id.ToString() == worldId))
+                    {
+                        worldInjected++;
+                        if (worldSample.Length == 0)
+                        {
+                            worldSample = worldId;
+                        }
+                    }
+                }
+            }
+
+            response = response with { WorldInjected = worldInjected };
+
+            if (worldSample.Length > 0)
+            {
+                var worldView = dialogue.GenerateDialogueView(
+                    new SPTarkov.Server.Core.Models.Eft.Dialog.GetMailDialogViewRequestData
+                    {
+                        DialogId = new MongoId(worldSample),
+                        Limit = 100,
+                        Type = SPTarkov.Server.Core.Models.Enums.MessageType.GlobalChat
+                    },
+                    target);
+
+                response = response with
+                {
+                    WorldViewMessages = worldView?.Messages?.Count ?? 0,
+                    WorldViewProfiles = worldView?.Profiles?.Count ?? 0
+                };
+            }
+
             if (sample.Length > 0 && peers.Exists(p => p.DialogId.ToString() == sample))
             {
                 var view = dialogue.GenerateDialogueView(
@@ -296,7 +400,7 @@ public sealed class LinkCallbacks(
             response = response with { Error = ex.GetType().Name + ": " + ex.Message };
         }
 
-        PluginLog.Info("[P2a] 自检 active=" + response.PatchActive + " peers=" + response.Peers + " 虚拟好友=" + response.VirtualFriends + " 好友总数=" + response.FriendsTotal + " 注入好友=" + response.InjectedFriends + " 对话总数=" + response.DialoguesTotal + " 注入对话=" + response.InjectedDialogues + " 样本=" + response.SampleDialogId + " 消息=" + response.ViewMessages + " profiles=" + response.ViewProfiles + " err=" + response.Error);
+        PluginLog.Info("[P2a] 自检 active=" + response.PatchActive + " peers=" + response.Peers + " 虚拟好友=" + response.VirtualFriends + " 好友总数=" + response.FriendsTotal + " 注入好友=" + response.InjectedFriends + " 对话总数=" + response.DialoguesTotal + " 注入对话=" + response.InjectedDialogues + " 样本=" + response.SampleDialogId + " 消息=" + response.ViewMessages + " profiles=" + response.ViewProfiles + " 世界注入=" + response.WorldInjected + " 世界消息=" + response.WorldViewMessages + " err=" + response.Error);
         return new ValueTask<string>(httpResponse.NoBody(response));
     }
 }

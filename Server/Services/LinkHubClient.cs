@@ -298,6 +298,32 @@ public sealed class LinkHubClient : IDisposable
                                  + (direct.Replayed ? "（离线补投）" : ""));
                     break;
 
+                case "world":
+                    LinkWorldMessage world = new()
+                    {
+                        Id = Str(root, "id"),
+                        Channel = Str(root, "channel"),
+                        From = Str(root, "from"),
+                        FromNick = Str(root, "fromNick"),
+                        Text = Str(root, "text"),
+                        At = Long(root, "at"),
+                        Replayed = root.TryGetProperty("replayed", out JsonElement worldReplay) &&
+                                   worldReplay.ValueKind == JsonValueKind.True
+                    };
+                    _state.AddWorld(world);
+                    _logger.Info($"[SENTINEL Link] 世界[{world.Channel}] {world.FromNick}: {world.Text}"
+                                 + (world.Replayed ? "（历史补投）" : ""));
+                    break;
+
+                case "world-sync":
+                    int worldBatch = root.TryGetProperty("count", out JsonElement worldBatchElement) &&
+                                     worldBatchElement.TryGetInt32(out int parsedWorldBatch)
+                        ? parsedWorldBatch
+                        : 0;
+                    string syncChannel = Str(root, "channel");
+                    _logger.Info($"[SENTINEL Link] 世界频道 {syncChannel} 历史补投 {worldBatch} 条");
+                    break;
+
                 case "dm-sync":
                     int batch = root.TryGetProperty("count", out JsonElement batchElement) &&
                                 batchElement.TryGetInt32(out int parsedBatch)
@@ -381,6 +407,37 @@ public sealed class LinkHubClient : IDisposable
         }
 
         byte[] payload = JsonSerializer.SerializeToUtf8Bytes(new { type = "dm", to, text }, Json);
+        await _sendLock.WaitAsync(token).ConfigureAwait(false);
+        try
+        {
+            await socket.SendAsync(payload, WebSocketMessageType.Text, true, token).ConfigureAwait(false);
+            return true;
+        }
+        catch (Exception ex)
+        {
+            _state.LastError = ex.Message;
+            return false;
+        }
+        finally
+        {
+            _sendLock.Release();
+        }
+    }
+
+    /// <summary>
+    /// 发一条世界频道消息（world / trade / lfg）。Hub 记历史并广播给同域其他实例；
+    /// 不回给发送方，本实例的画面由自己的 LinkState 补。
+    /// </summary>
+    public async Task<bool> SendWorldAsync(string channel, string text, CancellationToken token)
+    {
+        ClientWebSocket? socket = _socket;
+        if (socket is not { State: WebSocketState.Open })
+        {
+            return false;
+        }
+
+        byte[] payload = JsonSerializer.SerializeToUtf8Bytes(
+            new { type = "world", channel, text }, Json);
         await _sendLock.WaitAsync(token).ConfigureAwait(false);
         try
         {

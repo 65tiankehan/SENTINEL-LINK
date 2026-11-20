@@ -34,6 +34,15 @@ namespace SentinelLink.Hub.Services
         /// <summary>私聊单条文本上限（字符），和聊天的 512 分开——私聊更长一点。</summary>
         public int MaxDirectLength { get; init; } = 1024;
 
+        /// <summary>世界频道单条文本上限（字符），和 chat 一致。</summary>
+        public int MaxWorldLength { get; init; } = 512;
+
+        /// <summary>
+        /// 每个 realm 每个频道（world / trade / lfg）保留多少条历史。
+        /// 晚进来的实例如要看到最近讨论，靠的就是这份环形缓冲。
+        /// </summary>
+        public int WorldHistoryLimit { get; init; } = ReadInt("SENTINEL_HUB_WORLD_HISTORY", 100);
+
         /// <summary>每个收件人的离线私聊队列上限，超了丢最旧的。</summary>
         public int DirectQueueLimit { get; init; } = ReadInt("SENTINEL_HUB_DM_LIMIT", 500);
 

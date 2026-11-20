@@ -47,6 +47,16 @@ public sealed class LinkRouter(
                 "/sentinelink/client/p2a/state",
                 async (url, request, sessionId, output, cancellationToken) =>
                     await callbacks.P2aState(url, request, sessionId)),
+
+            new RouteAction<LinkWorldSendRequest>(
+                "/sentinelink/client/world/send",
+                async (url, request, sessionId, output, cancellationToken) =>
+                    await callbacks.SendWorld(url, request, sessionId)),
+
+            new RouteAction<LinkWorldStateRequest>(
+                "/sentinelink/client/world/state",
+                async (url, request, sessionId, output, cancellationToken) =>
+                    await callbacks.WorldState(url, request, sessionId)),
         ])
 {
 }
