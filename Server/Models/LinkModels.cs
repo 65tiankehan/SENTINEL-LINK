@@ -238,3 +238,49 @@ public sealed record LinkDirectStateResponse
     [JsonPropertyName("serverTime")]
     public long ServerTime { get; init; }
 }
+/// <summary>P2a 自检：传自己的 profile id（sessionId），服务端直接问一遍原生控制器。</summary>
+public sealed record LinkP2aStateRequest : SPTarkov.Server.Core.Models.Utils.IRequestData
+{
+    [JsonPropertyName("sessionId")]
+    public string SessionId { get; init; } = "";
+}
+
+/// <summary>P2a 自检回包。</summary>
+public sealed record LinkP2aStateResponse
+{
+    [JsonPropertyName("patchActive")]
+    public bool PatchActive { get; init; }
+
+    [JsonPropertyName("patchVersion")]
+    public int PatchVersion { get; init; }
+
+    [JsonPropertyName("peers")]
+    public int Peers { get; init; }
+
+    [JsonPropertyName("virtualFriends")]
+    public int VirtualFriends { get; init; }
+
+    [JsonPropertyName("friendsTotal")]
+    public int FriendsTotal { get; init; }
+
+    [JsonPropertyName("injectedFriends")]
+    public int InjectedFriends { get; init; }
+
+    [JsonPropertyName("dialoguesTotal")]
+    public int DialoguesTotal { get; init; }
+
+    [JsonPropertyName("injectedDialogues")]
+    public int InjectedDialogues { get; init; }
+
+    [JsonPropertyName("sampleDialogId")]
+    public string SampleDialogId { get; init; } = "";
+
+    [JsonPropertyName("viewMessages")]
+    public int ViewMessages { get; init; }
+
+    [JsonPropertyName("viewProfiles")]
+    public int ViewProfiles { get; init; }
+
+    [JsonPropertyName("error")]
+    public string Error { get; init; } = "";
+}

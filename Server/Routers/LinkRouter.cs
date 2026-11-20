@@ -42,6 +42,11 @@ public sealed class LinkRouter(
                 "/sentinelink/client/dm/state",
                 async (url, request, sessionId, output, cancellationToken) =>
                     await callbacks.DirectState(url, request, sessionId)),
+
+            new RouteAction<LinkP2aStateRequest>(
+                "/sentinelink/client/p2a/state",
+                async (url, request, sessionId, output, cancellationToken) =>
+                    await callbacks.P2aState(url, request, sessionId)),
         ])
 {
 }

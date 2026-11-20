@@ -239,3 +239,61 @@ dotnet .\Tools\SyntheticPeer\bin\Release\net10.0\SyntheticPeer.dll --server-id p
 | 风险表 +3 行 | patch 被打穿→降级回自建面板不崩游戏；写脏 `dialogues`→只走 LinkState/spool；32 hex→24 hex MongoId 派生冲突→前 20 位 + 4 位域标记 + 启动查重 |
 
 **为什么不直接砍掉自建面板**：世界频道原生没有这个概念；局内原生没有聊天入口（neko 也得自己往背包塞按钮）。面板退成「补原生做不到的两块」，不跟任何 UI 打架。
+
+## P2a 第 1 步：原生好友 / 私聊注入（2026-11-21 00:00）
+
+把 Hub 对端注进游戏**原生**好友面板与私聊窗口，客户端一行 UI 都不用写。
+侦察依据见 `docs\P2a-注入清单.md`（Cecil 直读 4.1.6 的 2,635 个类型，未跑游戏、未改存档）。
+
+| 位置 | 改动 |
+|---|---|
+| `Server\Services\LinkFriends.cs`（新，322 行） | serverId(32 hex) → MongoId(24 hex) 派生（sha256 前 20 hex + 域标记 `1e0f`）、Aid 派生、虚拟好友/对话/视图装配；对端来源于「在线 peers ∪ 私聊历史发件人」，所以对方下线后消息仍在 |
+| `Server\Patches\DialoguePatches.cs`（新，4 条补丁） | `GetFriendList` Postfix 追加好友；`GenerateDialogueList` Postfix 追加对话；`GenerateDialogueView` **Prefix 短路**（虚拟 id 不在 `DialogueRecords` 里，走原生必 NRE）；`SendMessage` **Prefix 拦截** → 转 Hub，不进 `SendPlayerMessageToNpc` |
+| `Server\Services\PluginLog.cs`（新） | 给静态补丁用的日志转发（Info/Warn/Error 三个 Action） |
+| `Server\Startup\LinkServerLoad.cs` | 注入 `LinkFriends`、装配 `DialoguePatchRuntime`、逐类打补丁（失败只降级并记 error） |
+| `Server\Callbacks\LinkCallbacks.cs` | 新增 `P2aState`（自检：直接调原生控制器，回报注入数量） |
+| `Server\Routers\LinkRouter.cs` | 新增 `POST /sentinelink/client/p2a/state` |
+| `Server\Models\LinkModels.cs` | `LinkP2aStateRequest` / `LinkP2aStateResponse` |
+| `Server\SENTINEL.Link.Server.csproj` | 加 `0Harmony`（`$(SptPath)\0Harmony.dll`，`<Private>false</Private>`） |
+
+### 实测（本机，Hub 5180 + SPT.Server 6969 + SyntheticPeer）
+
+| 项 | 数字 |
+|---|---|
+| 补丁 | 启动日志 `[P2a] 原生好友/私聊注入已启用（4/4）；虚拟 id 域标记 = 1e0f` |
+| 好友注入 | `好友总数 3 / 注入好友 1`（原生 2 个 SPT 假人 + 我们对端） |
+| 对话注入 | `对话总数 24 / 注入对话 1`，样本 id `cb98d304c62cd9195f521e0f`（长度 24、尾 `1e0f`） |
+| 打开对话 | `消息 3 / profiles 2` —— 三条来自 `路人X5` 的私聊原样出现在原生视图里 |
+| 对端离线 | 关掉 SyntheticPeer 后仍 `虚拟好友 1 / 注入好友 1`（走历史发件人兜底） |
+| **存档不脏写** | 两个 profile `sha256` 前后完全一致（`2EFF5A89` / `26AF0796`，526,031 B / 447,532 B）；文件里搜不到任何虚拟 id |
+| 构建 | `SENTINEL.Link.Server.dll` **93,696 B**（0 警告 0 错误） |
+
+### 两个坑（已踩过，记下来）
+
+1. **SPT 4.1.6 的请求体是 zlib 压缩的**：直接 POST 明文 JSON 会在 `SptHttpListener.HandleAsync` 抛
+   `The archive entry was compressed using an unsupported compression method`（Critical），路由回 200 空包。
+   探针必须 `ZLibStream` 压一遍；响应也是压缩的，`Invoke-WebRequest` 拿到的 `Content` 是乱码，别看它、看服务端日志。
+2. **MongoId 必须正好 24 hex**：派生消息 id 时写成 22+4=26 位 → `ObjectId must be a 24-character hex string`，
+   `GenerateDialogueList` 的 Postfix 整体抛异常被降级。改成 20+4 后恢复正常。
+
+### 怎么复现
+
+```powershell
+# 1) Hub + 服务端
+dotnet D:\sptEdior\SENTINELLink\Hub\bin\Release\net10.0\SENTINEL.Link.Hub.dll
+E:\EFT\SPT_Runtime\SPT.Server.exe
+
+# 2) 让一个假对端连上并给我们发 3 条
+dotnet D:\sptEdior\SENTINELLink\Tools\SyntheticPeer\bin\Release\net10.0\SyntheticPeer.dll `
+  --hub http://127.0.0.1:5180 --server-id peer-x5 --nickname 路人X5 --key dev-local `
+  --to bc44f77d62f04c908ad73837b9d893c4 --count 3 --delay 200
+
+# 3) 自检（body 必须 zlib 压缩）
+#    结果看 E:\EFT\SPT_Runtime\user\logs\spt\spt*.log 的「[P2a] 自检 …」
+```
+
+### 还没做
+
+- 游戏内眼睛验收：主菜单好友面板点开虚拟好友、发一条、看对方（假对端）是否收到 —— 需要能登录的客户端。
+- `SendMessage` 拦截的**游戏内**验证（本次只证明了前缀补丁已挂上，未从 UI 触发）。
+- 未读数（`Dialogue.New`）目前恒 0，接 P2b 面板时再补。

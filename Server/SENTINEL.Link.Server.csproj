@@ -12,6 +12,10 @@
     <NoWarn>CS0105</NoWarn>
   </PropertyGroup>
   <ItemGroup>
+    <Reference Include="0Harmony">
+      <HintPath>$(SptPath)\0Harmony.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
     <Reference Include="SemanticVersioning">
       <HintPath>$(SptPath)\SemanticVersioning.dll</HintPath>
       <Private>false</Private>

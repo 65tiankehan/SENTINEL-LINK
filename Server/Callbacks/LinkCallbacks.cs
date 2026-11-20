@@ -11,7 +11,9 @@ namespace SentinelLink.Server.Callbacks;
 public sealed class LinkCallbacks(
     HttpResponseUtil httpResponse,
     LinkState state,
-    LinkHubClient hub)
+    LinkHubClient hub,
+    LinkFriends friends,
+    SPTarkov.Server.Core.Controllers.DialogueController dialogue)
 {
     /// <summary>P0 入口：证明「客户端 → 本地服务端」这条链路通了，并回报 Hub 现状。</summary>
     public ValueTask<string> Ping(
@@ -190,6 +192,111 @@ public sealed class LinkCallbacks(
             ServerTime = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()
         };
 
+        return new ValueTask<string>(httpResponse.NoBody(response));
+    }
+
+    /// <summary>
+    /// P2a 自检：直接调原生 DialogueController（会被我们四条补丁拦到），
+    /// 回报「注入了几条好友 / 几个对话 / 打开对话能取到几条消息」。
+    /// 只读：GetFriendList / GenerateDialogueList / GenerateDialogueView 都不写存档。
+    /// </summary>
+    public ValueTask<string> P2aState(
+        string url,
+        LinkP2aStateRequest request,
+        MongoId sessionId)
+    {
+        LinkP2aStateResponse response = new()
+        {
+            PatchActive = SentinelLink.Server.Patches.DialoguePatchRuntime.Active,
+            PatchVersion = friends.Version,
+            Peers = state.Peers,
+        };
+
+        try
+        {
+            MongoId target = sessionId;
+            if (MongoId.IsValidMongoId(request.SessionId))
+            {
+                target = new MongoId(request.SessionId);
+            }
+
+            if (target.IsEmpty)
+            {
+                response = response with { Error = "缺少 sessionId（传 profile id 或先登录）" };
+                return new ValueTask<string>(httpResponse.NoBody(response));
+            }
+
+            List<LinkFriends.PeerRef> peers = new(friends.Refresh(true));
+            response = response with { VirtualFriends = peers.Count };
+
+            var friendList = dialogue.GetFriendList(target);
+            int injectedFriends = 0;
+            if (friendList?.Friends != null)
+            {
+                foreach (var friend in friendList.Friends)
+                {
+                    if (peers.Exists(p => p.DialogId.ToString() == friend.Id.ToString()))
+                    {
+                        injectedFriends++;
+                    }
+                }
+
+                response = response with
+                {
+                    FriendsTotal = friendList.Friends.Count,
+                    InjectedFriends = injectedFriends
+                };
+            }
+
+            var dialogues = dialogue.GenerateDialogueList(target);
+            int injectedDialogues = 0;
+            string sample = "";
+            if (dialogues != null)
+            {
+                foreach (var item in dialogues)
+                {
+                    if (peers.Exists(p => p.DialogId.ToString() == item.Id.ToString()))
+                    {
+                        injectedDialogues++;
+                        if (sample.Length == 0)
+                        {
+                            sample = item.Id.ToString();
+                        }
+                    }
+                }
+
+                response = response with
+                {
+                    DialoguesTotal = dialogues.Count,
+                    InjectedDialogues = injectedDialogues,
+                    SampleDialogId = sample
+                };
+            }
+
+            if (sample.Length > 0 && peers.Exists(p => p.DialogId.ToString() == sample))
+            {
+                var view = dialogue.GenerateDialogueView(
+                    new SPTarkov.Server.Core.Models.Eft.Dialog.GetMailDialogViewRequestData
+                    {
+                        DialogId = new MongoId(sample),
+                        Limit = 100,
+                        Type = SPTarkov.Server.Core.Models.Enums.MessageType.UserMessage
+                    },
+                    target);
+
+                response = response with
+                {
+                    ViewMessages = view?.Messages?.Count ?? 0,
+                    ViewProfiles = view?.Profiles?.Count ?? 0
+                };
+            }
+        }
+        catch (Exception ex)
+        {
+            response = response with { Error = ex.GetType().Name + ": " + ex.Message };
+        }
+
+        PluginLog.Info("[P2a] 自检 active=" + response.PatchActive + " peers=" + response.Peers + " 虚拟好友=" + response.VirtualFriends + " 好友总数=" + response.FriendsTotal + " 注入好友=" + response.InjectedFriends + " 对话总数=" + response.DialoguesTotal + " 注入对话=" + response.InjectedDialogues + " 样本=" + response.SampleDialogId + " 消息=" + response.ViewMessages + " profiles=" + response.ViewProfiles + " err=" + response.Error);
         return new ValueTask<string>(httpResponse.NoBody(response));
     }
 }
