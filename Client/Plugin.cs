@@ -29,6 +29,7 @@ namespace SentinelLink.Client
         private bool _updateLogged;
 
         private bool _drawLogged;
+        private bool _disablePatches;
 
         private void Awake()
         {
@@ -42,18 +43,32 @@ namespace SentinelLink.Client
 
             _panel = new LinkChatPanel(toggleKey);
 
-            try
-            {
-                Harmony harmony = new Harmony(SentinelLink.Shared.BuildInfo.ClientGuid);
-                harmony.PatchAll(typeof(Plugin).Assembly);
-                Log.LogInfo($"[Link] 输入锁补丁已应用 · {harmony.GetPatchedMethods().Count()} 个方法");
-            }
-            catch (Exception ex)
-            {
-                // 补丁失败不影响看消息，只是打字时会带着角色乱跑
-                Log.LogError("[Link] 输入锁补丁失败：" + ex);
-            }
 
+            _disablePatches = Config.Bind(
+                "General",
+                "DisableInputLockPatches",
+                false,
+                "诊断用：置 true 后不加载任何 Harmony 补丁（排查物品右键菜单重复「使用」这类问题）。改完要重启游戏。").Value;
+
+            if (_disablePatches)
+            {
+                Log.LogWarning("[Link] 已按配置跳过全部 Harmony 补丁（DisableInputLockPatches = true）");
+            }
+            else
+            {
+                try
+                {
+                    Harmony harmony = new Harmony(SentinelLink.Shared.BuildInfo.ClientGuid);
+                    harmony.PatchAll(typeof(Plugin).Assembly);
+                    string targets = string.Join(", ", harmony.GetPatchedMethods().Select(m => m.DeclaringType?.Name + "." + m.Name));
+                    Log.LogInfo($"[Link] 输入锁补丁已应用 · {harmony.GetPatchedMethods().Count()} 个方法 · {targets}");
+                }
+                catch (Exception ex)
+                {
+                    // 补丁失败不影响看消息，只是打字时会带着角色乱跑
+                    Log.LogError("[Link] 输入锁补丁失败：" + ex);
+                }
+            }
             Log.LogInfo($"{SentinelLink.Shared.BuildInfo.ProductName} {SentinelLink.Shared.BuildInfo.Version} 已加载 · {toggleKey.Value} / Ctrl+L 打开世界聊天");
         }
 

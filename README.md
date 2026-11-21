@@ -93,3 +93,19 @@ copy Client\bin\Release\SENTINEL.Link.Client.dll E:\EFT-Fika\BepInEx\plugins\SEN
 - 面板打开时锁角色移动/视角/开火（只锁本地玩家，不影响联机队友）。
 - 原生私聊消息只存 `LinkState` + Hub spool，**不写 profile**；profile 里出现 `…1e0f` 结尾的空对话即视为脏写，启动时会自动清理。
 - Hub 重启会丢在线表与聊天历史（私聊 spool 不丢）。
+## 安装（给玩家）
+
+`installer/dist/SENTINEL-LINK-Setup.exe` 一次装三样：客户端插件、服务端模组、本地 Hub。
+
+1. 双击安装器，选游戏根目录（含 `EscapeFromTarkov.exe` 的那层）
+2. 装完重启游戏；主菜单底栏「消息」里就有好友和世界频道
+3. 要联机时先跑游戏目录里的 `SENTINEL-Link-Hub\启动 Hub.cmd`（需要 .NET 10 运行时）
+
+联别人的服：改 `SPT_Runtime\user\mods\cn.passionyang.sentinellink.server\config.json` 的 `hubUrl` / `inviteKey` / `realm`。
+
+安装器源码在 `installer/`（Tauri 2 + WebView2，520×448 无边框）；自己出包：
+
+```powershell
+pwsh -File installer\scripts\build-payload.ps1 -SptClientDir "E:\EFT"
+cd installer\src-tauri; cargo build --release --offline
+```

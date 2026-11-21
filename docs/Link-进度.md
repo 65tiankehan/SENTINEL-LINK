@@ -437,3 +437,20 @@ dotnet D:\sptEdior\SENTINELLink\Tools\SyntheticPeer\bin\Release\net10.0\Syntheti
 2. PowerShell 里多行字符串数组写 C# 片段，`'                },'` 这类行会因引号/括号组合被解析器判成语法错 → 改用 `@'…'@` here-string 再 `-split "`r?`n"`。
 
 还没做：①局内入口（背包界面塞一个聊天按钮，原生局内没有）；②客户端面板加「世界」页签（现在只有原生窗）；③两个真实实例跨服验（只用假对端验过）。
+
+## 2026-11-21 · 安装器（Tauri 2，照 Min 那套）
+
+| 项 | 值 |
+| --- | --- |
+| 工程 | `installer/`（`scripts/build-payload.ps1` + `src-tauri` + `ui/index.html`） |
+| 载荷 | `payload.zip` **178,250 B**，12 个条目（客户端 dll+pdb / 服务端 dll+package.json+config.json / Hub 6 个文件 + `启动 Hub.cmd`） |
+| 安装器 | `dist/SENTINEL-LINK-Setup.exe` **3,121,152 B**，sha256 `93852192F97CCDE92FA100E603D6D5AA61DFA274BAE9857ABD8F1A5C9556670D` |
+| 内嵌校验 | EOCD 反推起点 `0x22D744`、长度 178,250、`PK\x03\x04` 签名正确；内嵌 zip sha256 与 `payload.zip` **逐字节一致** |
+| 窗口 | 520×448、无边框透明、Win10 走窗口区域裁圆角、WebView2 缩放强制 1.0 |
+| 卸载 | 删客户端插件 + 服务端模组 + Hub 三个目录，保留服务端 `config.json`；写 `HKCU\...\Uninstall\SENTINEL LINK` |
+
+- 版本号唯一真相源仍是 `Shared/BuildInfo.cs`：`build-payload.ps1` 正则读它，写进服务端 `package.json` 与 Hub 说明；`tauri.conf.json` / `Cargo.toml` 跟 0.1.0。
+- Hub 以**框架依赖**方式发布（69 KB dll + 162 KB exe），装机需要 .NET 10 运行时；`启动 Hub.cmd` 会先 `where dotnet`，缺了给下载地址而不是闪退。
+- 踩坑：Hub 的 `bin\Release\...\SENTINEL.Link.Hub.dll` 被正在跑的 Hub 进程锁定 → `MSB3027/MSB3021`，必须先停 Hub 再 publish（本次停 9868 → publish → 起 15544，游戏侧服务端 2 秒内自动重连）。
+- 踩坑：`src-tauri/payload/` 目录在干净 clone 里不存在，`ZipFile.CreateFromDirectory` 报 `Could not find a part of the path ...payload.zip` → 脚本已改成先 `New-Item -Force` 建目录（本次是手工补建后通过）。
+- UI 截图：`docs/design/link-installer-ui.png`（520×448，Edge headless 渲 `installer/ui/index.html`）。
