@@ -454,3 +454,17 @@ dotnet D:\sptEdior\SENTINELLink\Tools\SyntheticPeer\bin\Release\net10.0\Syntheti
 - 踩坑：Hub 的 `bin\Release\...\SENTINEL.Link.Hub.dll` 被正在跑的 Hub 进程锁定 → `MSB3027/MSB3021`，必须先停 Hub 再 publish（本次停 9868 → publish → 起 15544，游戏侧服务端 2 秒内自动重连）。
 - 踩坑：`src-tauri/payload/` 目录在干净 clone 里不存在，`ZipFile.CreateFromDirectory` 报 `Could not find a part of the path ...payload.zip` → 脚本已改成先 `New-Item -Force` 建目录（本次是手工补建后通过）。
 - UI 截图：`docs/design/link-installer-ui.png`（520×448，Edge headless 渲 `installer/ui/index.html`）。
+
+## 2026-11-21 · 文档收尾（0.1.0 发布准备）
+
+| 文档 | 改了什么 |
+| --- | --- |
+| `README.md` | 状态表补 P2b-2 ✅、安装器 ✅ `fcffaa7`、发布稿 ✅；未验清单加到三条（在线即时投递 / 真实双实例跨服 / 好友栏计数含频道） |
+| `docs/SENTINEL-Link-计划书.md` | 路线表新增「**0.1.0 发布**」行（安装器 + 发布稿，tag/release 待发）+ 2026-11-21 修订说明 |
+| `docs/发布稿-Link-0.1.0.md` | 新建，138 行 / 6,924 B：论坛帖正文（含标题格式 `【SPT4.1.6】`、标签、原理表、安装三步、已知限制、下载 sha256） |
+| `docs/design/link-installer-ui.png` | 安装器第一屏截图 520×448（Edge headless 渲 `installer/ui/index.html`） |
+| `docs/Link-进度.md` | 本节 |
+
+发布稿里的数字全部现查核对：安装器 **3,121,152 B**、sha256 `93852192F97CCDE92FA100E603D6D5AA61DFA274BAE9857ABD8F1A5C9556670D`；载荷 **178,250 B / 12 条目**；内嵌 zip 与 `payload.zip` 逐字节一致（EOCD 反推起点 `0x22D744`）。
+
+> 还没做的两件：`link-0.1.0` 的 git tag + release 附件；仓库推远端（本地仓库目前**无 remote**，发布稿里写的是「地址回帖里补」）。
