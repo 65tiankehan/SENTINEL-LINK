@@ -19,6 +19,7 @@ SPT 4.1.6 的**联机 + 社交**套件。对外名 **SENTINEL Link**，技术身
 | P2a 原生好友 + 私聊（4/4 补丁，存档 0 字节变化） | ✅ | `158344d` `32a5c61` |
 | P2b-2 世界频道走原生聊天窗 + 局内入口 | ✅ | `426c6b3` `dce6031`（真机：24 条历史 + 自己发 1 条；局内 F11 可发） |
 | 0.1.0 安装器（Tauri 2：客户端插件 + 服务端模组 + 本地 Hub） | ✅ | `fcffaa7`（exe 3,121,152 B / 载荷 178,250 B / 内嵌 zip 逐字节一致） |
+| 安装器界面多语言 + 三套主题（中/英/俄 × 暖金/暗黑/亮白） | ✅ | `a5f0c33`（exe 3,126,272 B / 界面与 F9 菜单同一套色） |
 | 0.1.0 发布稿（论坛帖 + 已知限制） | ✅ | `docs/发布稿-Link-0.1.0.md` 138 行 / 6,924 B |
 | P3 跳蚤远程报价 / P4 局内空投 / P5 组队 | ⬜ | — |
 
@@ -119,11 +120,11 @@ cd installer\src-tauri; cargo build --release --offline
 
 | 资产 | 字节 | sha256 |
 | --- | --- | --- |
-| `SENTINEL-LINK-Setup.exe` | 3,121,664 | `3F86D78CD07968DEEAA322E6DE81EC1488EB9A73643579D5BA513AB2A77D15CF` |
-| `SENTINEL-LINK-0.1.0.zip` | 189,892 | `252FC8AA0C87A7F467D892E296BC54DF558166CB98980C76BE5DD670C5D13634` |
+| `SENTINEL-LINK-Setup.exe` | 3,126,272 | `D5239C9F5BDD83B545DD7110B03B881727CC1AF49A25E4ECD333263B91FC9F80` |
+| `SENTINEL-LINK-0.1.0.zip` | 189,893 | `3A2C84024DCFE5B1A41559D3ED58AEDFE65B859EE195689493B6976112559DAF` |
 
 - 仓库：<https://github.com/65tiankehan/SENTINEL-LINK>（MIT，欢迎 issue / PR）
-- 安装包：本仓库 release 的 `SENTINEL-LINK-Setup.exe`；sp-mod 页面同步上传同一份 zip
+- 安装包：本仓库 release 的 `SENTINEL-LINK-Setup.exe`（界面自带 中/英/俄 与 暖金/暗黑/亮白 三套主题，右上角两个小胶囊切换）；sp-mod 页面同步上传同一份 zip
 - 三个组件可单独取用：只想连别人的 Hub 就只装客户端插件；自己做 Hub 起 `Hub/`；只写服务端逻辑看 `Server/Services/LinkFriends.cs` 与 `Patches/DialoguePatches.cs`
 - 二次开发请注意：`docs/Hub-协议.md` 是帧契约（只增字段不删、未知帧忽略），改协议要同步升版本；虚拟 id 必须保持 `sha256 前 20 位 + 1e0f` 的派生规则，否则会和别人的实现撞车
 

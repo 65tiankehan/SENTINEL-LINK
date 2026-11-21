@@ -506,3 +506,14 @@ dotnet D:\sptEdior\SENTINELLink\Tools\SyntheticPeer\bin\Release\net10.0\Syntheti
 - 远端 release 两个资产已 `--clobber` 覆盖，digest 与新本地 sha256 一致。
 - 店铺缩略图：`docs/design/link-thumbnail-1280x720.png`（1280×720 / 271,597 B，深色标题页 + 原生聊天窗实拍）；源 HTML 在 `docs/design/link-thumbnail.html`。
 - Forge 填写口径全文见 `docs/sp-mod-上传信息.md`（Name / GUID / Teaser / Description / License / 披露项逐条）。
+
+## 2026-11-21 · 安装器界面：三语言 + 三主题（0.1.0 资产返工）
+
+| 改了什么 | 怎么做的 |
+| --- | --- |
+| 三语言（中 / 英 / 俄） | 与游戏内 I18n 同一套规则：**中文原文当键**，`DICT.en/ru` 缺条目回落中文；静态文案在 DOM 里收集一次原文，切语言按原文重写（保留前后空白），脚本写入的动态文案走 `t("…")` |
+| 三主题（暖金 / 暗黑 / 亮白） | CSS 变量 + `html[data-theme]`，色值直接取 F9 菜单那套 token（暖金 `#F2C97C`、暗黑 `#0A84FF`、亮白 `#007AFF`）；`--primaryFg` 让主按钮在暖金下面用深字 |
+| 选择记忆 | `localStorage.link.lang` / `link.theme`；URL 片段 `#dark`、`#light-ru` 可强制预览，供设计稿截图 |
+| 在普通浏览器里可预览 | 原来第一行 `window.__TAURI__.core` 在无 Tauri 环境直接抛错、整页脚本停摆；加空实现兜底后，`file://` 打开也能看 UI（也给设计稿截图用） |
+
+产物：`dist/SENTINEL-LINK-Setup.exe` **3,126,272 B / sha256 `D5239C9F…C9F80`**；发布 zip **189,893 B / `3A2C8402…59DAF`**（README 改过，重新打包）。校验：内嵌 UI 新版已确认（启动实机截图 `docs/design/link-installer-warm-live.png`，头部可见「中」「暖」两个新胶囊）。

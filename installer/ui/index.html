@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="zh-CN">
+<html lang="zh-CN" data-theme="warm" data-lang="cn">
 <head>
 <meta charset="utf-8" />
 <title>SENTINEL LINK</title>
@@ -10,6 +10,43 @@
     --sep:rgba(84,84,88,.65);
     --blue:#0a84ff; --green:#30d158; --orange:#ff9f0a; --red:#ff453a;
     --indigo:#5e5ce6; --cyan:#64d2ff; --purple:#bf5af2;
+    --mark1:#ffd60a; --mark2:#ff9f0a; --markFg:#1a1200;
+    --barBg:rgba(28,28,30,.94);
+    --ctrl:rgba(120,120,128,.22); --ctrlFg:#fff;
+    --primaryFg:#fff;
+  }
+  /* 暖金：与游戏内 F9 菜单同一套色（Accent #F2C97C / PanelStart #24201B） */
+  html[data-theme="warm"]{
+    --bg:#000; --bg2:#141110; --bg3:#241f1a; --bg4:#3a322a;
+    --label:#fffaf0; --label2:rgba(246,238,222,.62); --label3:rgba(246,238,222,.34);
+    --sep:rgba(246,235,216,.14);
+    --blue:#f2c97c; --cyan:#d9c1a0;
+    --mark1:#ffd60a; --mark2:#f2a93b; --markFg:#1a1200;
+    --barBg:rgba(36,32,27,.94);
+    --ctrl:rgba(246,235,216,.12); --ctrlFg:#fffaf0;
+    --primaryFg:#2a1d08;
+  }
+  /* 暗黑：iOS 26 深色 */
+  html[data-theme="dark"]{
+    --bg:#000; --bg2:#1c1c1e; --bg3:#2c2c2e; --bg4:#3a3a3c;
+    --label:#fff; --label2:rgba(235,235,245,.6); --label3:rgba(235,235,245,.3);
+    --sep:rgba(84,84,88,.65);
+    --blue:#0a84ff; --cyan:#64d2ff;
+    --mark1:#0a84ff; --mark2:#0060df; --markFg:#fff;
+    --barBg:rgba(28,28,30,.94);
+    --ctrl:rgba(120,120,128,.22); --ctrlFg:#fff;
+    --primaryFg:#fff;
+  }
+  /* 亮白：iOS 26 浅色 */
+  html[data-theme="light"]{
+    --bg:#fff; --bg2:#f2f2f7; --bg3:#fff; --bg4:#e5e5ea;
+    --label:#141416; --label2:rgba(60,60,67,.62); --label3:rgba(60,60,67,.36);
+    --sep:rgba(60,60,67,.14);
+    --blue:#007aff; --cyan:#32ade6;
+    --mark1:#007aff; --mark2:#0060df; --markFg:#fff;
+    --barBg:rgba(255,255,255,.92);
+    --ctrl:rgba(120,120,128,.16); --ctrlFg:#141416;
+    --primaryFg:#fff;
   }
   *{box-sizing:border-box;-webkit-font-smoothing:antialiased;user-select:none}
   html,body{margin:0;height:100%;background:var(--bg2);
@@ -18,14 +55,17 @@
   .win{flex:1;background:var(--bg2);border-radius:0;border:none;
     display:flex;flex-direction:column;overflow:hidden}
   .bar{height:42px;display:flex;align-items:center;gap:9px;padding:0 14px;border-bottom:1px solid var(--sep);
-    background:rgba(28,28,30,.94)}
-  .mark{width:21px;height:21px;border-radius:7px;background:linear-gradient(160deg,#ffd60a,#ff9f0a);
-    color:#1a1200;font-weight:800;font-size:12px;display:flex;align-items:center;justify-content:center}
+    background:var(--barBg)}
+  .mark{width:21px;height:21px;border-radius:7px;background:linear-gradient(160deg,var(--mark1),var(--mark2));
+    color:var(--markFg);font-weight:800;font-size:12px;display:flex;align-items:center;justify-content:center}
   .bar b{font-size:12.5px;letter-spacing:.4px}
   .bar .ver{margin-left:auto;font-size:11px;color:var(--label3)}
+  .chip{font-size:10.5px;padding:3px 8px;border-radius:7px;background:var(--ctrl);color:var(--label2);
+    cursor:pointer;letter-spacing:.3px;flex:none}
+  .chip:hover{color:var(--label)}
   .bar .x{width:22px;height:22px;border-radius:6px;display:flex;align-items:center;justify-content:center;
-    color:var(--label3);font-size:14px;cursor:pointer;margin-left:8px}
-  .bar .x:hover{background:rgba(120,120,128,.22);color:#fff}
+    color:var(--label3);font-size:14px;cursor:pointer;margin-left:6px}
+  .bar .x:hover{background:var(--ctrl);color:var(--label)}
   .body{flex:1;padding:16px 18px;display:flex;flex-direction:column;gap:10px;overflow:hidden;min-height:0}
   .foot{padding:11px 18px 14px;display:flex;flex-direction:column;gap:10px}
   .rowActions{display:flex;gap:9px}
@@ -33,8 +73,8 @@
   .sub{font-size:12px;color:var(--label2);margin:0;line-height:1.5}
   .hint{font-size:11px;color:var(--label3);line-height:1.45}
   .hero{display:flex;flex-direction:column;align-items:center;gap:8px;text-align:center;padding:6px 0}
-  .logo{width:52px;height:52px;border-radius:16px;background:linear-gradient(160deg,#ffd60a,#ff9f0a);
-    color:#1a1200;font-weight:800;font-size:24px;display:flex;align-items:center;justify-content:center;
+  .logo{width:52px;height:52px;border-radius:16px;background:linear-gradient(160deg,var(--mark1),var(--mark2));
+    color:var(--markFg);font-weight:800;font-size:24px;display:flex;align-items:center;justify-content:center;
     box-shadow:0 10px 26px rgba(255,159,10,.24)}
   .ok{width:52px;height:52px;border-radius:26px;background:rgba(48,209,88,.16);color:var(--green);
     font-size:24px;display:flex;align-items:center;justify-content:center}
@@ -50,22 +90,22 @@
   .gh{display:flex;align-items:baseline;justify-content:space-between;font-size:11.5px;color:var(--label2)}
   .gh span:last-child{color:var(--label3)}
   .path{font-size:11px;color:var(--label2);font-family:ui-monospace,"SF Mono",Consolas,monospace;
-    background:var(--bg3);border-radius:9px;padding:8px 11px;border:1px solid rgba(255,255,255,.04);
+    background:var(--bg3);border-radius:9px;padding:8px 11px;border:1px solid var(--sep);
     overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
   .btn{height:38px;border-radius:11px;display:flex;align-items:center;justify-content:center;
     font-size:12.5px;font-weight:600;cursor:pointer;flex:1;transition:filter .12s}
   .btn:hover{filter:brightness(1.08)}
   .btn:active{transform:translateY(1px)}
-  .btn.primary{background:var(--blue);color:#fff;box-shadow:0 6px 18px rgba(10,132,255,.26)}
-  .btn.ghost{background:rgba(120,120,128,.22);color:var(--label);flex:none;padding:0 14px;min-width:76px}
+  .btn.primary{background:var(--blue);color:var(--primaryFg);box-shadow:0 6px 18px rgba(10,132,255,.26)}
+  .btn.ghost{background:var(--ctrl);color:var(--ctrlFg);flex:none;padding:0 14px;min-width:76px}
   .btn.danger{background:var(--red);color:#fff;box-shadow:0 6px 18px rgba(255,69,58,.24)}
-  .btn.ghostRed{background:transparent;color:#ff8280;border:1px solid rgba(255,69,58,.4);flex:none;padding:0 12px}
+  .btn.ghostRed{background:transparent;color:var(--red);border:1px solid rgba(255,69,58,.4);flex:none;padding:0 12px}
   .btn[disabled]{opacity:.45;pointer-events:none}
   .dots{display:flex;gap:6px;align-items:center;justify-content:center}
-  .dots i{width:6px;height:6px;border-radius:3px;background:rgba(235,235,245,.22);transition:all .2s}
+  .dots i{width:6px;height:6px;border-radius:3px;background:var(--label3);transition:all .2s}
   .dots i.on{background:var(--label);width:16px}
   .prog{height:8px;border-radius:4px;background:var(--bg4);overflow:hidden}
-  .prog i{display:block;height:100%;border-radius:4px;background:linear-gradient(90deg,#0a84ff,#64d2ff);
+  .prog i{display:block;height:100%;border-radius:4px;background:linear-gradient(90deg,var(--blue),var(--cyan));
     width:0;transition:width .25s ease}
   .log{font-family:ui-monospace,"SF Mono",Consolas,monospace;font-size:10.5px;color:var(--label3);
     display:flex;flex-direction:column;gap:5px;max-height:112px;overflow:hidden}
@@ -88,6 +128,8 @@
     <div class="bar" data-tauri-drag-region>
       <div class="mark">链</div><b>SENTINEL LINK</b>
       <span class="ver" id="verText">v0.1.0</span>
+      <div class="chip" id="btnLang" title="Language / Язык">中</div>
+      <div class="chip" id="btnTheme" title="Theme">暖</div>
       <div class="x" id="btnClose">✕</div>
     </div>
 
@@ -122,7 +164,7 @@
           <div class="row"><div class="ico" style="background:rgba(48,209,88,.16);color:var(--green)">中</div>
             <div class="t"><b>本地 Hub</b><span>转发消息、离线排队；双击就能跑</span></div></div>
         </div>
-        <div class="hint">面板在游戏里按 <b style="color:#fff">F11</b>（或 Ctrl+L）开合；好友与聊天在主菜单底栏的「消息」里。</div>
+        <div class="hint">面板在游戏里按 <b style="color:var(--label)">F11</b>（或 Ctrl+L）开合；好友与聊天在主菜单底栏的「消息」里。</div>
       </div>
       <div class="foot">
         <div class="dots"><i></i><i class="on"></i><i></i></div>
@@ -178,7 +220,7 @@
         <div class="hero" style="padding-top:2px">
           <div class="ok">✓</div>
           <h2>安装完成</h2>
-          <p class="sub">重启游戏；主菜单「消息」里就能看到好友与世界频道。Hub 在安装目录的 <b style="color:#fff">SENTINEL-Link-Hub\启动 Hub.cmd</b>。</p>
+          <p class="sub">重启游戏；主菜单「消息」里就能看到好友与世界频道。Hub 在安装目录的 <b style="color:var(--label)">SENTINEL-Link-Hub\启动 Hub.cmd</b>。</p>
         </div>
         <div class="card">
           <div class="kv"><span>客户端</span><b id="doneClient">—</b></div>
@@ -220,7 +262,7 @@
         <div class="hero" style="padding-top:2px">
           <div class="ok" style="background:rgba(120,120,128,.2);color:var(--label2)">✓</div>
           <p class="sub" id="uninstSub">服务端 config.json 已保留，重装后直连原来的 Hub。</p>
-          <p class="sub" id="uninstSub">设置文件已保留，重装后会读回原来的开关。</p>
+          <p class="sub" id="uninstSub2">设置文件已保留，重装后会读回原来的开关。</p>
         </div>
         <div class="path" id="uninstDetail">—</div>
       </div>
@@ -230,9 +272,240 @@
 </div>
 
 <script>
-const { invoke } = window.__TAURI__.core;
+// 允许在普通浏览器里预览（设计稿截图 / 调色）：没有 Tauri 时用空实现兜底。
+const TAURI = window.__TAURI__ || { core: { invoke: async () => ({}) }, dialog: { open: async () => null } };
+const { invoke } = TAURI.core;
 const state = { root: "", detection: null };
 
+/* ================= 文案 =================
+   键 = 界面里的中文原文；缺条目回落到中文，与游戏内 I18n 同一套规则。 */
+const DICT = {
+  en: {
+    "好友和聊天，长在原生界面里": "Friends and chat, inside the native UI",
+    "给 SPT 4.1.6 的联机社交层。": "A social layer for SPT 4.1.6.",
+    "好友列表、私聊、世界频道全用游戏原本的消息界面，一个 Hub 把不同服的人串起来。":
+      "Friends, direct messages and world channels all live in the game's own messenger; one Hub links people across servers.",
+    "不用注册账号、不改存档、装完就有。": "No accounts, no save edits — it just works after install.",
+    "下一步": "Next",
+    "跳过": "Skip",
+    "上一步": "Back",
+    "装进去的是这些": "What gets installed",
+    "客户端插件": "Client plugin",
+    "F11 面板、输入锁、跨服会话": "F11 panel, input lock, cross-server sessions",
+    "服务端模组": "Server mod",
+    "接 Hub，把对端好友与消息注入原生对话": "Talks to the Hub, injects peers and messages into native dialogues",
+    "本地 Hub": "Local Hub",
+    "转发消息、离线排队；双击就能跑": "Relays messages, queues while offline; double-click to run",
+    "面板在游戏里按 F11（或 Ctrl+L）开合；好友与聊天在主菜单底栏的「消息」里。":
+      "Press F11 (or Ctrl+L) in game for the panel; friends and chat live under Messages in the main menu.",
+    "可以装了": "Ready to install",
+    "正在检测游戏目录…": "Detecting game folder…",
+    "必装": "Required",
+    "游戏目录": "Game folder",
+    "检测中": "Checking",
+    "换目录": "Change folder",
+    "立即安装": "Install now",
+    "卸载": "Uninstall",
+    "正在写入文件": "Writing files",
+    "整体进度": "Overall progress",
+    "取消": "Cancel",
+    "安装完成": "Installation complete",
+    "重启游戏；主菜单「消息」里就能看到好友与世界频道。Hub 在安装目录的 SENTINEL-Link-Hub\\启动 Hub.cmd。":
+      "Restart the game; friends and world channels show up under Messages. Hub lives at SENTINEL-Link-Hub\\Start Hub.cmd in the install folder.",
+    "客户端": "Client",
+    "服务端": "Server",
+    "安装位置": "Installed to",
+    "打开游戏目录": "Open game folder",
+    "完成": "Done",
+    "真要拆掉吗": "Really remove it?",
+    "卸载会立刻失去下面这些，没有后悔药。": "Uninstalling drops all of this immediately — no undo.",
+    "好友与世界频道": "Friends and world channels",
+    "消息界面回到只有商人": "The messenger goes back to traders only",
+    "跨服私聊": "Cross-server DMs",
+    "Hub 队列里没领的消息也会一起清掉": "Unclaimed messages in the Hub queue are cleared too",
+    "服务端 config.json 会保留": "Server config.json is kept",
+    "重装后直连原来的 Hub": "A reinstall reconnects to the same Hub",
+    "以后想装回来，随时重跑安装器，半分钟的事。": "Want it back later? Re-run the installer — takes half a minute.",
+    "继续用着": "Keep using",
+    "仍要卸载": "Remove anyway",
+    "服务端 config.json 已保留，重装后直连原来的 Hub。": "Server config.json kept; a reinstall reconnects to the same Hub.",
+    "设置文件已保留，重装后会读回原来的开关。": "Settings kept; a reinstall reads the same options back.",
+    "关闭": "Close",
+    "未选择": "Not selected",
+    "SPT 已就绪": "SPT ready",
+    "目录不对": "Wrong folder",
+    "已经装好了": "Already installed",
+    "点「重新安装」会覆盖成当前版本，开关设置不会动。": "Reinstall overwrites with this version; your options stay.",
+    "重新安装": "Reinstall",
+    "先确认游戏目录": "Confirm the game folder",
+    "校验游戏目录": "Verifying game folder",
+    "读取内置载荷": "Reading embedded payload",
+    "写入": "Writing",
+    "完成，共 {n} 个文件": "Done — {n} files",
+    "失败：{msg}": "Failed: {msg}",
+    "安装失败": "Install failed",
+    "已卸载": "Uninstalled",
+    "没有需要删除的文件": "Nothing to remove",
+    "选择游戏根目录（含 EscapeFromTarkov.exe）": "Pick the game root (contains EscapeFromTarkov.exe)",
+    "语言": "Language",
+    "主题": "Theme"
+  },
+  ru: {
+    "好友和聊天，长在原生界面里": "Друзья и чат — в родном интерфейсе",
+    "给 SPT 4.1.6 的联机社交层。": "Социальный слой для SPT 4.1.6.",
+    "好友列表、私聊、世界频道全用游戏原本的消息界面，一个 Hub 把不同服的人串起来。":
+      "Друзья, личные сообщения и мировые каналы — в родном мессенджере; один Hub связывает людей с разных серверов.",
+    "不用注册账号、不改存档、装完就有。": "Без аккаунтов и правок сохранений — работает сразу после установки.",
+    "下一步": "Далее",
+    "跳过": "Пропустить",
+    "上一步": "Назад",
+    "装进去的是这些": "Что устанавливается",
+    "客户端插件": "Клиентский плагин",
+    "F11 面板、输入锁、跨服会话": "Панель F11, блокировка ввода, межсерверные сессии",
+    "服务端模组": "Серверный мод",
+    "接 Hub，把对端好友与消息注入原生对话": "Связь с Hub, подмешивает собеседников и сообщения в родные диалоги",
+    "本地 Hub": "Локальный Hub",
+    "转发消息、离线排队；双击就能跑": "Пересылает сообщения, копит офлайн; запуск двойным щелчком",
+    "面板在游戏里按 F11（或 Ctrl+L）开合；好友与聊天在主菜单底栏的「消息」里。":
+      "В игре панель по F11 (или Ctrl+L); друзья и чат — в «Сообщениях» нижнего меню.",
+    "可以装了": "Можно устанавливать",
+    "正在检测游戏目录…": "Ищем папку игры…",
+    "必装": "Обязательно",
+    "游戏目录": "Папка игры",
+    "检测中": "Проверка",
+    "换目录": "Сменить папку",
+    "立即安装": "Установить",
+    "卸载": "Удалить",
+    "正在写入文件": "Запись файлов",
+    "整体进度": "Общий прогресс",
+    "取消": "Отмена",
+    "安装完成": "Установка завершена",
+    "重启游戏；主菜单「消息」里就能看到好友与世界频道。Hub 在安装目录的 SENTINEL-Link-Hub\\启动 Hub.cmd。":
+      "Перезапустите игру; друзья и мировые каналы появятся в «Сообщениях». Hub — в SENTINEL-Link-Hub\\Start Hub.cmd.",
+    "客户端": "Клиент",
+    "服务端": "Сервер",
+    "安装位置": "Куда установлено",
+    "打开游戏目录": "Открыть папку игры",
+    "完成": "Готово",
+    "真要拆掉吗": "Точно удалить?",
+    "卸载会立刻失去下面这些，没有后悔药。": "Удаление сразу убирает всё это — отмены нет.",
+    "好友与世界频道": "Друзья и мировые каналы",
+    "消息界面回到只有商人": "В мессенджере останутся только торговцы",
+    "跨服私聊": "Личные сообщения между серверами",
+    "Hub 队列里没领的消息也会一起清掉": "Незабранные сообщения из очереди Hub тоже пропадут",
+    "服务端 config.json 会保留": "config.json сервера сохраняется",
+    "重装后直连原来的 Hub": "После переустановки — тот же Hub",
+    "以后想装回来，随时重跑安装器，半分钟的事。": "Захотите вернуть — запустите установщик снова, полминуты.",
+    "继续用着": "Оставить",
+    "仍要卸载": "Всё равно удалить",
+    "服务端 config.json 已保留，重装后直连原来的 Hub。": "config.json сервера сохранён; после переустановки — тот же Hub.",
+    "设置文件已保留，重装后会读回原来的开关。": "Настройки сохранены; после переустановки вернутся.",
+    "关闭": "Закрыть",
+    "未选择": "Не выбрано",
+    "SPT 已就绪": "SPT готов",
+    "目录不对": "Не та папка",
+    "已经装好了": "Уже установлено",
+    "点「重新安装」会覆盖成当前版本，开关设置不会动。": "Переустановка перезапишет текущей версией; настройки сохранятся.",
+    "重新安装": "Переустановить",
+    "先确认游戏目录": "Проверьте папку игры",
+    "校验游戏目录": "Проверка папки игры",
+    "读取内置载荷": "Чтение встроенного пакета",
+    "写入": "Запись",
+    "完成，共 {n} 个文件": "Готово — файлов: {n}",
+    "失败：{msg}": "Ошибка: {msg}",
+    "安装失败": "Установка не удалась",
+    "已卸载": "Удалено",
+    "没有需要删除的文件": "Удалять нечего",
+    "选择游戏根目录（含 EscapeFromTarkov.exe）": "Выберите корень игры (с EscapeFromTarkov.exe)",
+    "语言": "Язык",
+    "主题": "Тема"
+  }
+};
+const LANGS = ["cn","en","ru"];
+const LANG_LABEL = { cn: "中", en: "EN", ru: "RU" };
+let LANG = "cn";
+function t(key, vars){
+  let s = LANG === "cn" ? key : ((DICT[LANG] && DICT[LANG][key]) || key);
+  if (vars) for (const k in vars) s = s.split("{" + k + "}").join(vars[k]);
+  return s;
+}
+
+/* 主题：warm / dark / light，与游戏内 F9 三套同名 */
+const THEMES = ["warm","dark","light"];
+const THEME_LABEL = { warm: "暖", dark: "暗", light: "亮" };
+// 非中文用户看汉字没有意义，chip 换成通用符号（暖金=◆ 暗黑=☾ 亮白=☀）
+const THEME_GLYPH = { warm: "◆", dark: "☾", light: "☀" };
+const THEME_DICT = {
+  en: { warm: "Warm", dark: "Dark", light: "Light" },
+  ru: { warm: "Тёплая", dark: "Тёмная", light: "Светлая" }
+};
+function themeChip(){ return LANG === "cn" ? THEME_LABEL[currentTheme()] : THEME_GLYPH[currentTheme()]; }
+function themeLabel(kind){
+  if (LANG === "cn") return { warm: "暖金", dark: "暗黑", light: "亮白" }[kind];
+  return THEME_DICT[LANG][kind];
+}
+
+/* 静态节点：收集一次原文，切语言时按原文重写（保留前后空白）。 */
+const staticNodes = [];
+function collectStaticNodes(){
+  const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT, {
+    acceptNode(n){
+      if (!/\S/.test(n.nodeValue)) return NodeFilter.FILTER_REJECT;
+      const p = n.parentNode && n.parentNode.nodeName;
+      if (p === "SCRIPT" || p === "STYLE") return NodeFilter.FILTER_REJECT;
+      return /[\u4e00-\u9fff]/.test(n.nodeValue) ? NodeFilter.FILTER_ACCEPT : NodeFilter.FILTER_REJECT;
+    }
+  });
+  let n;
+  while ((n = walker.nextNode())) staticNodes.push({ node: n, zh: n.nodeValue });
+}
+function applyStatic(){
+  for (const item of staticNodes){
+    const raw = item.zh;
+    const lead = raw.match(/^\s*/)[0], tail = raw.match(/\s*$/)[0];
+    item.node.nodeValue = lead + t(raw.trim()) + tail;
+  }
+}
+
+function applyChrome(){
+  document.documentElement.setAttribute("data-lang", LANG);
+  document.documentElement.lang = LANG === "cn" ? "zh-CN" : (LANG === "ru" ? "ru" : "en");
+  document.getElementById("btnLang").textContent = LANG_LABEL[LANG];
+  document.getElementById("btnTheme").textContent = themeChip();
+  // 由脚本写入、不在静态节点里的文字，切语言后重算一遍
+  refreshDynamicText();
+}
+
+let _lastDetect = null;
+function refreshDynamicText(){
+  const det = state.detection || _lastDetect;
+  const path = document.getElementById("readyPath");
+  if (path && !state.root) path.textContent = t("未选择");
+  const rs = document.getElementById("readyState");
+  if (rs && det){
+    const ok = det.has_game && det.has_bepinex && det.has_server_root;
+    rs.textContent = ok ? t("SPT 已就绪") : t("目录不对");
+  }
+  const rt = document.getElementById("readyTitle");
+  const sub = document.getElementById("readySub");
+  const inst = document.getElementById("doInstall");
+  if (det){
+    const ok = det.has_game && det.has_bepinex && det.has_server_root;
+    if (det.installed && ok){
+      rt.textContent = t("已经装好了");
+      sub.textContent = t("点「重新安装」会覆盖成当前版本，开关设置不会动。");
+      inst.textContent = t("重新安装");
+    } else {
+      rt.textContent = ok ? t("可以装了") : t("先确认游戏目录");
+      sub.textContent = det.message || "";
+      inst.textContent = t("立即安装");
+    }
+  }
+  const it = document.getElementById("instTitle");
+  if (it && it.dataset.state === "failed") it.textContent = t("安装失败");
+}
+
+/* ================= 视图 ================= */
 const views = ["viewIntro1","viewIntro2","viewReady","viewInstalling","viewDone","viewUninstall","viewUninstalled"];
 function show(id){
   views.forEach(v => document.getElementById(v).classList.toggle("on", v === id));
@@ -240,7 +513,8 @@ function show(id){
 function logLine(text, mark){
   const box = document.getElementById("instLog");
   const div = document.createElement("div");
-  div.innerHTML = "<b>" + (mark || "·") + "</b> " + text;
+  div.innerHTML = "<b>" + (mark || "·") + "</b> ";
+  div.appendChild(document.createTextNode(text));
   box.prepend(div);
   while (box.children.length > 8) box.lastChild.remove();
 }
@@ -249,27 +523,79 @@ function setProgress(pct){
   document.getElementById("instPct").textContent = pct + "%";
 }
 
+/* ================= 主题 / 语言 ================= */
+function currentTheme(){
+  return document.documentElement.getAttribute("data-theme") || "warm";
+}
+function setTheme(kind){
+  document.documentElement.setAttribute("data-theme", kind);
+  try { localStorage.setItem("link.theme", kind); } catch(e){}
+  document.getElementById("btnTheme").textContent = themeChip();
+  document.getElementById("btnTheme").title = themeLabel(kind);
+}
+function setLang(code){
+  LANG = code;
+  try { localStorage.setItem("link.lang", code); } catch(e){}
+  applyStatic();
+  applyChrome();
+}
+(function initPrefs(){
+  let theme = "warm", lang = "cn";
+  try {
+    theme = localStorage.getItem("link.theme") || "warm";
+    lang = localStorage.getItem("link.lang") || "cn";
+  } catch(e){}
+  // 允许用 URL 片段预览：#dark / #light / #dark-en —— 设计稿截图与本地调色都靠它
+  const frag = (location.hash || "").replace(/^#/, "");
+  if (frag){
+    const parts = frag.split("-");
+    if (THEMES.indexOf(parts[0]) >= 0) theme = parts[0];
+    if (parts[1] && LANGS.indexOf(parts[1]) >= 0) lang = parts[1];
+  }
+  if (THEMES.indexOf(theme) < 0) theme = "warm";
+  if (LANGS.indexOf(lang) < 0) lang = "cn";
+  document.documentElement.setAttribute("data-theme", theme);
+  LANG = lang;
+  collectStaticNodes();
+  applyStatic();
+  document.getElementById("btnTheme").textContent = themeChip();
+  document.getElementById("btnTheme").title = themeLabel(theme);
+  document.getElementById("btnLang").textContent = LANG_LABEL[lang];
+  document.getElementById("btnLang").title = t("语言");
+  document.documentElement.lang = lang === "cn" ? "zh-CN" : lang;
+})();
+
+document.getElementById("btnLang").onclick = () => {
+  const next = LANGS[(LANGS.indexOf(LANG) + 1) % LANGS.length];
+  setLang(next);
+};
+document.getElementById("btnTheme").onclick = () => {
+  const next = THEMES[(THEMES.indexOf(currentTheme()) + 1) % THEMES.length];
+  setTheme(next);
+};
+
+/* ================= 安装流程 ================= */
 async function detect(root){
   const det = await invoke("detect_path", { root });
   state.detection = det;
+  _lastDetect = det;
   state.root = det.root || root;
-  document.getElementById("readyPath").textContent = state.root || "未选择";
+  document.getElementById("readyPath").textContent = state.root || t("未选择");
   const ok = det.has_game && det.has_bepinex && det.has_server_root;
-  document.getElementById("readyState").textContent = ok
-    ? "SPT 已就绪"
-    : "目录不对";
-  document.getElementById("readyState").style.color = ok ? "var(--green)" : "var(--orange)";
+  const rs = document.getElementById("readyState");
+  rs.textContent = ok ? t("SPT 已就绪") : t("目录不对");
+  rs.style.color = ok ? "var(--green)" : "var(--orange)";
   const installBtn = document.getElementById("doInstall");
   const uninstallBtn = document.getElementById("goUninstall");
   if (det.installed && ok){
-    document.getElementById("readyTitle").textContent = "已经装好了";
-    document.getElementById("readySub").textContent = "点「重新安装」会覆盖成当前版本，开关设置不会动。";
-    installBtn.textContent = "重新安装";
+    document.getElementById("readyTitle").textContent = t("已经装好了");
+    document.getElementById("readySub").textContent = t("点「重新安装」会覆盖成当前版本，开关设置不会动。");
+    installBtn.textContent = t("重新安装");
     uninstallBtn.style.display = "";
   } else {
-    document.getElementById("readyTitle").textContent = ok ? "可以装了" : "先确认游戏目录";
+    document.getElementById("readyTitle").textContent = ok ? t("可以装了") : t("先确认游戏目录");
     document.getElementById("readySub").textContent = det.message || "";
-    installBtn.textContent = "立即安装";
+    installBtn.textContent = t("立即安装");
     uninstallBtn.style.display = "none";
   }
   installBtn.toggleAttribute("disabled", !det.has_bepinex);
@@ -303,29 +629,31 @@ document.getElementById("toReady").onclick = async () => {
 
 document.getElementById("pickPath").onclick = async () => {
   const { open } = window.__TAURI__.dialog;
-  const picked = await open({ directory: true, multiple: false, title: "选择游戏根目录（含 EscapeFromTarkov.exe）" });
+  const picked = await open({ directory: true, multiple: false, title: t("选择游戏根目录（含 EscapeFromTarkov.exe）") });
   if (picked) await detect(picked);
 };
 
 document.getElementById("doInstall").onclick = async () => {
   show("viewInstalling");
-  logLine("校验游戏目录", "✓");
+  logLine(t("校验游戏目录"), "✓");
   setProgress(18);
-  logLine("读取内置载荷", "✓");
+  logLine(t("读取内置载荷"), "✓");
   setProgress(38);
-  document.getElementById("instTitle").textContent = "正在写入文件";
+  const title = document.getElementById("instTitle");
+  title.textContent = t("正在写入文件");
+  title.dataset.state = "";
   try{
     const report = await invoke("install", { root: state.root });
     if (!report.ok){ throw new Error(report.message); }
     let pct = 60;
     for (const file of report.files){
-      logLine("写入 " + file, "✓");
+      logLine(t("写入") + " " + file, "✓");
       pct = Math.min(96, pct + 8);
       setProgress(pct);
       await new Promise(r => setTimeout(r, 90));
     }
     setProgress(100);
-    logLine("完成，共 " + report.files.length + " 个文件", "✓");
+    logLine(t("完成，共 {n} 个文件", { n: report.files.length }), "✓");
     document.getElementById("doneClient").textContent = "SENTINEL.Link.Client.dll";
     document.getElementById("doneServer").textContent = "SENTINEL.Link.Server.dll";
     document.getElementById("doneRoot").textContent = state.root;
@@ -333,8 +661,9 @@ document.getElementById("doInstall").onclick = async () => {
     try { await invoke("save_state", { introSeen: true, lastRoot: state.root }); } catch(e){}
     setTimeout(() => show("viewDone"), 420);
   }catch(error){
-    logLine("失败：" + (error.message || error), "✗");
-    document.getElementById("instTitle").textContent = "安装失败";
+    logLine(t("失败：{msg}", { msg: error.message || error }), "✗");
+    title.textContent = t("安装失败");
+    title.dataset.state = "failed";
     setProgress(0);
   }
 };
@@ -347,8 +676,8 @@ document.getElementById("goUninstall").onclick = () => show("viewUninstall");
 document.getElementById("keepUsing").onclick = () => { if (state.detection && state.detection.installed) { show("viewReady"); } else { invoke("close_window"); } };
 document.getElementById("confirmUninstall").onclick = async () => {
   const report = await invoke("uninstall", { root: state.root, keepConfig: true });
-  document.getElementById("uninstSub").textContent = report.message || "已卸载";
-  document.getElementById("uninstDetail").textContent = (report.files || []).join("　·　") || "没有需要删除的文件";
+  document.getElementById("uninstSub").textContent = report.message || t("已卸载");
+  document.getElementById("uninstDetail").textContent = (report.files || []).join("　·　") || t("没有需要删除的文件");
   if (state.detection) state.detection.installed = false;
   document.getElementById("goUninstall").style.display = "none";
   show("viewUninstalled");
@@ -357,7 +686,7 @@ document.getElementById("closeAfterUninstall").onclick = () => invoke("close_win
 
 (async () => {
   const info = await invoke("product_info");
-  document.getElementById("verText").textContent = "v" + info.version;
+  document.getElementById("verText").textContent = "v" + ((info && info.version) || "0.1.0");
 
   let saved = { introSeen: false, lastRoot: "" };
   try { saved = await invoke("load_state"); } catch(e){}
