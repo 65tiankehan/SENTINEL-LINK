@@ -24,6 +24,7 @@ public sealed class LinkServerLoad(
     LinkState state,
     LinkHubClient hub,
     LinkFriends friends,
+    SentinelLink.Server.Services.ProfileGuard profileGuard,
     SPTarkov.Server.Core.Servers.SaveServer saveServer) : IOnLoad
 {
     public Task OnLoadAsync(CancellationToken cancellationToken)
@@ -54,6 +55,10 @@ public sealed class LinkServerLoad(
 
         ApplyDialoguePatches(friends);
         PurgeGhostDialogues(friends);
+
+        // 存档哨兵：基线在清理之后记，之后每次写 profile 都比一次（掉条即 warn + 落盘）
+        SentinelLink.Server.Patches.DialoguePatchRuntime.Guard = profileGuard;
+        profileGuard.CaptureBaseline();
 
         return Task.CompletedTask;
     }
@@ -100,6 +105,7 @@ public sealed class LinkServerLoad(
                          typeof(GenerateDialogueListInjectPatch),
                          typeof(GenerateDialogueViewInjectPatch),
                          typeof(SendMessageToHubPatch),
+                         typeof(SaveProfileGuardPatch),
                      })
             {
                 try
@@ -113,10 +119,10 @@ public sealed class LinkServerLoad(
                 }
             }
 
-            DialoguePatchRuntime.Active = count == 4;
+            DialoguePatchRuntime.Active = count >= 4;
             if (DialoguePatchRuntime.Active)
             {
-                logger.Success("[P2a] 原生好友/私聊注入已启用（4/4）；虚拟 id 域标记 = " + LinkFriends.DomainTag);
+                logger.Success("[P2a] 原生好友/私聊注入已启用（4/4 对话 + 存档哨兵 " + (count - 4) + "/1）；虚拟 id 域标记 = " + LinkFriends.DomainTag);
                 LogWorldChannels(friends);
             }
             else

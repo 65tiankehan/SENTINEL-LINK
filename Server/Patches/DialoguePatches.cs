@@ -25,6 +25,9 @@ internal static class DialoguePatchRuntime
 
     public static LinkHubClient? Hub { get; set; }
 
+    /// <summary>存档哨兵（P2b 收尾：盯住 profile 对话条目数，再掉就当场留证）。</summary>
+    public static ProfileGuard? Guard { get; set; }
+
     /// <summary>四条补丁是否都打上了；false 时对端只出现在我们自己的面板里。</summary>
     public static bool Active { get; set; }
 
@@ -35,7 +38,7 @@ internal static class DialoguePatchRuntime
 internal static class GetFriendListInjectPatch
 {
     [HarmonyPostfix]
-    private static void Postfix(ref GetFriendListDataResponse __result)
+    private static void Postfix(MongoId sessionId, ref GetFriendListDataResponse __result)
     {
         if (!DialoguePatchRuntime.Ready)
         {
@@ -63,6 +66,20 @@ internal static class GetFriendListInjectPatch
                 }
 
                 __result.Friends.Add(DialoguePatchRuntime.Friends.BuildPeerUser(reference));
+            }
+
+            // 世界频道也要进好友表：客户端 ChatShared.UpdatableChatDialogue::CanSendMessage
+            // 只认 socialNetwork.FriendsList（拿不到就是「你不能向这个用户发送消息」）。
+            foreach (string channel in LinkFriends.WorldChannels)
+            {
+                string worldId = DialoguePatchRuntime.Friends.WorldDialogId(channel).ToString();
+                if (existing.Contains(worldId))
+                {
+                    continue;
+                }
+
+                existing.Add(worldId);
+                __result.Friends.Add(DialoguePatchRuntime.Friends.BuildWorldUser(channel));
             }
         }
         catch (Exception ex)
@@ -270,5 +287,21 @@ internal static class SendMessageToHubPatch
             PluginLog.Error("[P2a] SendMessage 转 Hub 失败，交回原生：" + ex.Message);
             return true;
         }
+    }
+}
+
+/// <summary>
+/// 存档哨兵：SPT 写 profile 之前记一次对话条目数（和启动基线比）。
+/// 说明：原计划前后各记一次，但 Postfix 里挂 Task 续体在 Harmony 下编译失败
+/// （IL Compile Error），改为只在 Prefix 采样 —— 足够区分「内存里就已经少了」和「写盘写丢了」。
+/// </summary>
+[HarmonyPatch(typeof(SPTarkov.Server.Core.Servers.SaveServer), nameof(SPTarkov.Server.Core.Servers.SaveServer.SaveProfileAsync))]
+internal static class SaveProfileGuardPatch
+{
+    [HarmonyPrefix]
+    private static void Prefix(MongoId sessionID)
+    {
+        ProfileGuard? guard = DialoguePatchRuntime.Guard;
+        guard?.Report("保存前", sessionID);
     }
 }

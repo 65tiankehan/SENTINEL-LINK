@@ -1,7 +1,7 @@
 # SENTINEL Link 进度
 
 > 一条一次，带数字。发版前把关键条目挪进计划书。
-## 当前状态（2026-11-21 01:03，随提交更新）
+## 当前状态（2026-11-21 11:05，随提交更新）
 
 | 阶段 | 状态 | 提交 | 关键数字 |
 |---|---|---|---|
@@ -10,15 +10,57 @@
 | P1.5 协议冻结 | ✅ | `55abcd5` | `docs\Hub-协议.md` 282 行，12 类帧 |
 | P2b-1 Hub 私聊 + 落盘队列 | ✅ | `de4a7a3` | 离线 100/100 对账，重启不丢 |
 | P2a 原生好友 + 私聊 | ✅ | `158344d` `32a5c61` | 好友 +1 / 对话 +1 / 消息 3~4；profile 字节差 0 |
-| P2b-2 世界频道 + 局内入口 | 🟡 世界频道已通，缺局内入口 | 见下节 | 原生窗 3 频道注入 +1 历史补投；profile 脏写 0 |
+| P2b-2 世界频道 | ✅ 真机验通 | 见 2026-11-21 11:00 段 | 3 频道渲染 + 可发送；`worldViewMessages=24`；profile 24 条不变 |
+| P2b-2 局内入口 | 🟡 待真机确认 | — | 面板是 IMGUI，理论上 F11 局内通用 |
 
 **未验清单**
 
 1. 对端**在线时**的即时投递（只验过离线排队 → 上线补投）；
 2. 两个真实 SPT 实例跨服（只用假对端验过）；
-3. 原生聊天窗里发消息穿到假对端（`SendMessage` 前缀是否真被 UI 触发）；
-4. 面板在线数修正后的真机显示（`_peerCount` 排除自己，未截图复验）。
+3. 面板在线数修正后的真机显示（`_peerCount` 排除自己，未截图复验）；
+4. 局内按 F11 能否拉起面板（IMGUI + 输入锁，待截图）；
+5. 好友列表表头数字（显示 5、实列 6）—— 客户端缓存计数，下一轮对齐。
 
+---
+
+## 2026-11-21 · P2b-2 真机验收：世界频道两处根因 + 存档哨兵
+
+**现象（用户 6 张真机截图）**
+
+1. 会话列表里世界频道标题变成「世界 #21/24」（正文当标题），点开**消息区全黑**；
+2. 「交易」「求组」连标题都没有；
+3. 在世界窗口发消息 → 红字「你不能向这个用户发送消息。」
+
+**根因一：消息类型用错（服务端）**
+
+- 世界频道原来用 `MessageType.GlobalChat`；客户端正文流只渲染 `UserMessage`，`GlobalChat` 被过滤，预览也生不出来（于是退化成取最后一条正文当标题）。
+- 改法：`LinkFriends.cs` 三处（`BuildWorldNativeMessage` 的 `MessageType`、`BuildWorldDialogueInfo` 的 `Type`、`MessagePreview.MessageType`）统一成 `MessageType.UserMessage`，与私聊完全同一套契约。
+- 复测：`worldViewMessages=24`，截图里 `世界 #16/20 … #20/20` 正常滚动。
+
+**根因二：发送闸门在客户端**
+
+- `ChatShared.UpdatableChatDialogue::CanSendMessage(SocialNetwork, out string error)` 只查 `socialNetwork.FriendsList.Contains(Profile)`，拿不到就返回「你不能向这个用户发送消息。」（服务端根本没被调用）。
+- 私聊能发是因为对端本来就在好友表里；三个频道只在对话列表、不在好友表。
+- 改法：`GetFriendListInjectPatch` 里把三个频道成员也注入 `__result.Friends`（按 id 去重），`friendsTotal=5`。
+- 复测：截图里「那个」发出成功、预览变「你: 那个」、「世界/交易/求组」出现在好友列表。
+
+**顺手加的存档哨兵（`Server\Services\ProfileGuard.cs`）**
+
+- 背景：09:26 那次会话里 profile 从 526,317 B / 24 条对话掉到 513,440 B / 1 条（已用 SPT 自带 backups 恢复）。查过核心所有成批销毁对话的路径：`RemoveAllDialoguesFromProfile` **全核心零调用**，`RemoveDialogue` 只由客户端删除按钮触发 → 未能复现。
+- 做法：启动时给每个 profile 记基线（`profile-baseline.txt`），每次 `SaveServer.SaveProfileAsync` 前缀采样；比基线少就 `logger.Warning` + 追加写 `profile-drop.log`（带时间、session、少了几条、虚拟条目数）。
+- 实测：`存档哨兵 1/1`、`基线已记录：2 个 profile（6ae7b434=24, 6af696c6=17）`、启动那次保存打 `保存前 dialogues=24 baseline=24`。
+- Harmony 坑：Postfix 里挂 `Task.ContinueWith` 续体报 `IL Compile Error (unknown location)`，改成只在 Prefix 采样（足够区分「内存里就少了」与「写盘写丢了」）。
+
+**收尾数字**
+
+| 项 | 值 |
+|---|---|
+| Server dll | 116,224 B / `83cb7e09` |
+| 补丁 | 4 对话 + 1 存档哨兵，0 警告 0 错误 |
+| profile | 526,317 B / 24 条 / 虚拟 id 0 |
+| 部署 | `E:\EFT` 与 `E:\EFT-Fika` 两处一致 |
+
+---
 
 ## 2026-11-20 · P0 第 1 步：仓库 + 服务端骨架
 

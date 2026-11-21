@@ -8,6 +8,7 @@ using SPTarkov.Server.Core.Models.Common;
 using SPTarkov.Server.Core.Models.Eft.Dialog;
 using SPTarkov.Server.Core.Models.Eft.Profile;
 using SPTarkov.Server.Core.Models.Enums;
+using SPTarkov.Server.Core.Servers;
 
 namespace SentinelLink.Server.Services;
 
@@ -16,7 +17,7 @@ namespace SentinelLink.Server.Services;
 /// 纯只读：这里产生的一切对象都只进 Harmony 的返回值，绝不写 SptProfile。
 /// </summary>
 [Injectable(InjectionType.Singleton)]
-public sealed class LinkFriends(LinkState state)
+public sealed class LinkFriends(LinkState state, SaveServer saveServer)
 {
     /// <summary>派生 MongoId 的域标记（追加在 20 位哈希之后，共 24 hex）。</summary>
     public const string DomainTag = "1e0f";
@@ -280,6 +281,21 @@ public sealed class LinkFriends(LinkState state)
         return text.Length == 24 && text.EndsWith(DomainTag, StringComparison.OrdinalIgnoreCase);
     }
 
+    /// <summary>临时诊断：打印当前 session 的对话条目数（定位 profile dialogues 掉条的时机用）。</summary>
+    public void LogDialogueCount(string tag, MongoId sessionId)
+    {
+        try
+        {
+            SptProfile? profile = saveServer.GetProfile(sessionId);
+            int count = profile?.DialogueRecords?.Count ?? -1;
+            PluginLog.Info($"[diag] {tag}: dialogues={count} session={sessionId}");
+        }
+        catch (Exception ex)
+        {
+            PluginLog.Warn($"[diag] {tag} 失败：{ex.Message}");
+        }
+    }
+
     /// <summary>兜底的空白对话视图（虚拟 id 但解析不到对端时用）。</summary>
     public GetMailDialogViewResponseData BuildEmptyView(MongoId sessionId)
     {
@@ -478,7 +494,8 @@ public sealed class LinkFriends(LinkState state)
         {
             Id = DeriveMessageId("world:" + channel + ":" + item.Id),
             UserId = mine ? selfId : WorldDialogId(channel),
-            MessageType = MessageType.GlobalChat,
+            // 必须与私聊同一套契约（UserMessage）：GlobalChat 的消息客户端不渲染（实测世界频道窗口全黑）
+            MessageType = MessageType.UserMessage,
             DateTime = item.At / 1000,
             UtcDateTime = item.At / 1000,
             Member = new UpdatableChatMember
@@ -502,7 +519,8 @@ public sealed class LinkFriends(LinkState state)
         DialogueInfo info = new()
         {
             Id = WorldDialogId(channel),
-            Type = MessageType.GlobalChat,
+            // 与私聊同契约：Type 写 GlobalChat 时客户端把标题取成最后一条正文、交易/求组标题还留空
+            Type = MessageType.UserMessage,
             Users = new List<UserDialogInfo> { BuildWorldUser(channel), BuildSelfUser(sessionId) },
             Messages = new List<Message>(),
             New = 0,
@@ -522,7 +540,7 @@ public sealed class LinkFriends(LinkState state)
             info.Message = new MessagePreview
             {
                 UserId = last.From == state.ServerId ? sessionId.ToString() : WorldDialogId(channel).ToString(),
-                MessageType = MessageType.GlobalChat,
+                MessageType = MessageType.UserMessage,
                 DateTime = last.At / 1000,
                 Text = last.Text,
             };
