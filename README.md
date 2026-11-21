@@ -115,6 +115,13 @@ cd installer\src-tauri; cargo build --release --offline
 
 ## 开源与发布
 
+最新版本：**[link-0.1.0](https://github.com/65tiankehan/SENTINEL-LINK/releases/tag/link-0.1.0)**
+
+| 资产 | 字节 | sha256 |
+| --- | --- | --- |
+| `SENTINEL-LINK-Setup.exe` | 3,121,152 | `93852192F97CCDE92FA100E603D6D5AA61DFA274BAE9857ABD8F1A5C9556670D` |
+| `SENTINEL-LINK-0.1.0.zip` | 189,187 | `C06CD24A928902A21D764E6430B92C805EEE28DBDC9667718A89E390FBA87AFA` |
+
 - 仓库：<https://github.com/65tiankehan/SENTINEL-LINK>（MIT，欢迎 issue / PR）
 - 安装包：本仓库 release 的 `SENTINEL-LINK-Setup.exe`；sp-mod 页面同步上传同一份 zip
 - 三个组件可单独取用：只想连别人的 Hub 就只装客户端插件；自己做 Hub 起 `Hub/`；只写服务端逻辑看 `Server/Services/LinkFriends.cs` 与 `Patches/DialoguePatches.cs`

@@ -482,3 +482,13 @@ dotnet D:\sptEdior\SENTINELLink\Tools\SyntheticPeer\bin\Release\net10.0\Syntheti
 
 - 二次开发的护栏写进 README 了：帧契约只增字段不删、虚拟 id 必须保持 `sha256 前 20 位 + 1e0f`，否则会和别人的实现撞车。
 - 还没做：`git push -u origin master`（等用户发话）、`link-0.1.0` tag、GitHub release 附件上传（安装器 + zip）。
+
+### 0.1.0 发版结果（2026-11-21 12:43）
+
+| 项 | 值 |
+| --- | --- |
+| 分支 | `master` 已 push（19 提交 / 57 文件），跟踪 `origin/master` |
+| Tag | `link-0.1.0`（annotated），已 push |
+| Release | <https://github.com/65tiankehan/SENTINEL-LINK/releases/tag/link-0.1.0> |
+| 资产 | `SENTINEL-LINK-Setup.exe` 3,121,152 B / `SENTINEL-LINK-0.1.0.zip` 189,187 B，digest 与本地 sha256 一致 |
+| 仓库 | PUBLIC、MIT、默认分支 master；description 与 7 个 topics 已设 |
