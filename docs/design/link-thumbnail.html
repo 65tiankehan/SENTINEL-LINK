@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body { width: 1280px; height: 720px; overflow: hidden; }
+  body {
+    font-family: "Microsoft YaHei UI", "Microsoft YaHei", "Segoe UI", sans-serif;
+    background:
+      radial-gradient(900px 520px at 12% 8%, rgba(255,183,77,.16), transparent 60%),
+      radial-gradient(760px 480px at 96% 92%, rgba(59,130,246,.18), transparent 62%),
+      #0d0f12;
+    color: #f2f3f5;
+    position: relative;
+    display: flex;
+    align-items: center;
+  }
+  .frame { position: absolute; inset: 0; border: 1px solid rgba(255,255,255,.07); }
+  .left { width: 560px; padding: 0 0 0 64px; z-index: 2; }
+  .badge {
+    width: 46px; height: 46px; border-radius: 12px;
+    background: linear-gradient(160deg, #ffc65c, #e39a12);
+    color: #2a1c00; font-weight: 800; font-size: 24px;
+    display: flex; align-items: center; justify-content: center;
+    box-shadow: 0 8px 24px rgba(227,154,18,.35);
+    margin-bottom: 22px;
+  }
+  h1 { font-size: 52px; line-height: 1.08; letter-spacing: .5px; font-weight: 800; }
+  h1 span { color: #ffc65c; }
+  .sub { margin-top: 16px; font-size: 19px; line-height: 1.6; color: #b9bec7; }
+  .chips { margin-top: 26px; display: flex; gap: 10px; flex-wrap: wrap; }
+  .chip {
+    font-size: 14px; padding: 7px 13px; border-radius: 999px;
+    background: rgba(255,255,255,.06); border: 1px solid rgba(255,255,255,.10);
+    color: #dfe3e9;
+  }
+  .chip.on { background: rgba(59,130,246,.16); border-color: rgba(59,130,246,.42); color: #cfe0ff; }
+  .foot { margin-top: 30px; font-size: 13.5px; color: #7d838d; letter-spacing: .3px; }
+  .shot {
+    position: absolute; right: 40px; top: 150px; width: 700px; height: 420px;
+    border-radius: 16px; overflow: hidden;
+    box-shadow: 0 26px 60px rgba(0,0,0,.62), 0 0 0 1px rgba(255,255,255,.09);
+    transform: rotate(-1.1deg);
+  }
+  .shot img { width: 100%; height: 100%; object-fit: cover; object-position: 42% 46%; display: block; }
+  .glow {
+    position: absolute; right: 100px; top: 140px; width: 580px; height: 430px;
+    background: radial-gradient(closest-side, rgba(59,130,246,.28), transparent 70%);
+    filter: blur(6px);
+  }
+</style>
+</head>
+<body>
+  <div class="frame"></div>
+  <div class="glow"></div>
+  <div class="left">
+    <div class="badge">链</div>
+    <h1>SENTINEL<br><span>LINK</span></h1>
+    <div class="sub">好友、私聊、世界频道<br>长在游戏原本的聊天窗里</div>
+    <div class="chips">
+      <div class="chip on">跨服好友</div>
+      <div class="chip">离线补投</div>
+      <div class="chip">三频道</div>
+      <div class="chip">单人可用</div>
+    </div>
+    <div class="foot">SPT 4.1.6 · MIT · 不改存档</div>
+  </div>
+  <div class="shot">
+    <img src="file:///C:/Users/Administrator/.dsh/attachments/v1/objects/62/62fe6de316bed308cca0d94a8f27e6fcd80249f56ae9166aff5190ae80b1db82">
+  </div>
+</body>
+</html>

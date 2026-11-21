@@ -2,6 +2,6 @@
   "name": "sentinel-link-server",
   "version": "0.1.0",
   "author": "SENTINEL",
-  "license": "Proprietary",
+  "license": "MIT",
   "description": "SENTINEL Link server-side: 联机社交层（Hub 桥 + 聊天/presence/报价/空投）。"
 }

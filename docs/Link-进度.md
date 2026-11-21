@@ -492,3 +492,17 @@ dotnet D:\sptEdior\SENTINELLink\Tools\SyntheticPeer\bin\Release\net10.0\Syntheti
 | Release | <https://github.com/65tiankehan/SENTINEL-LINK/releases/tag/link-0.1.0> |
 | 资产 | `SENTINEL-LINK-Setup.exe` 3,121,152 B / `SENTINEL-LINK-0.1.0.zip` 189,187 B，digest 与本地 sha256 一致 |
 | 仓库 | PUBLIC、MIT、默认分支 master；description 与 7 个 topics 已设 |
+
+### 0.1.0 资产返工：package.json 许可改 MIT（2026-11-21 13:05）
+
+| 项 | 旧 | 新 |
+| --- | --- | --- |
+| `Server/package.json` license | `Proprietary` | **`MIT`**（与仓库/License 一致） |
+| `payload.zip` | 178,250 B | **178,402 B** |
+| `SENTINEL-LINK-Setup.exe` | 3,121,152 B / `93852192…` | **3,121,664 B / `3F86D78C…`** |
+| `SENTINEL-LINK-0.1.0.zip` | 189,187 B / `C06CD24A…` | **189,892 B / `252FC8AA…`** |
+
+- 内嵌校验：EOCD 反推 `start=0x22D744`、`len=178,402`、签名 `504B0304`，内嵌 zip sha256 `482C9ED7…` 与 `payload.zip` 一致；解包 12 条目，`package.json` 里 `"license": "MIT"` 已核实。
+- 远端 release 两个资产已 `--clobber` 覆盖，digest 与新本地 sha256 一致。
+- 店铺缩略图：`docs/design/link-thumbnail-1280x720.png`（1280×720 / 271,597 B，深色标题页 + 原生聊天窗实拍）；源 HTML 在 `docs/design/link-thumbnail.html`。
+- Forge 填写口径全文见 `docs/sp-mod-上传信息.md`（Name / GUID / Teaser / Description / License / 披露项逐条）。

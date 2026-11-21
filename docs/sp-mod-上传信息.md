@@ -1,58 +1,139 @@
-# sp-mod / 论坛上传信息（SENTINEL LINK 0.1.0）
+# SPT Forge 填写内容（SENTINEL LINK 0.1.0）
 
-## 标题
+## Thumbnail
 
-`【SPT4.1.6】SENTINEL LINK —— 好友、私聊、世界频道，长在游戏原本的聊天窗里`
+上传 `docs/design/link-thumbnail-1280x720.png`（1280×720，**271,597 B**，16:9，小于 2 MB）。
 
-标签：`#4.1.6` `#联机` `#社交` `#单人可用` `#MIT`
+## Name（≤ 75）
 
-## 一句话简介（列表页用，≤ 100 字）
+```
+SENTINEL LINK
+```
 
-把跨服好友、私聊和世界频道接进游戏原本的好友列表与聊天窗；一条 Hub 中转，单人也用得上的社交层，不改存档。MIT 开源。
+## Mod GUID（可选，但 4.0.0+ 建议填）
 
-## 分类 / 兼容
+```
+cn.passionyang.sentinellink.server
+```
 
-| 字段 | 值 |
+> 这是我们服务端模组的 GUID（`Shared/BuildInfo.cs` 的 `ServerGuid`）。客户端插件是 `cn.passionyang.sentinellink.client`，Forge 这个字段只收一个，填服务端那个。
+
+## Teaser（≤ 255）
+
+```
+把跨服好友、私聊和三个公共频道接进游戏原本的好友列表与聊天窗；一条 Hub 中转，单人也用得上的社交层，不改存档。
+```
+
+## Description（Markdown，直接粘下面整段）
+
+```markdown
+## 这不是联机开黑
+
+SENTINEL LINK 给 SPT 4.1.6 加一层「社交」：好友列表、私聊、世界频道，全部长在游戏**原本**的消息界面里——没有第二套 UI，不用记新按键。
+
+你可以一个人玩，也可以和别的服的人聊天、加好友、挂报价（P3 起）。不需要 Fika。
+
+## 装完多出什么
+
+- **好友列表**里多出「世界 / 交易 / 求组」三个频道，和别的服的真人
+- **私聊**走原生对话框，对方离线也能发——Hub 每收件人排队 500 条、保留 168 小时，上线按序补投
+- **世界频道**长在原生聊天窗，翻历史、发中文都正常
+- **F11 面板**：局内外都能开，打开时自动锁人物输入（不会边打字边走路），`Ctrl+V` 粘中文
+
+## 怎么接进去的（给别人看原理，省得担心）
+
+| 游戏行为 | 我们的做法 |
 | --- | --- |
-| SPT 版本 | 4.1.6（EFT 0.16.9.40743） |
-| 类型 | 客户端插件（BepInEx 5）+ 服务端模组 + 本地 Hub |
-| 需要 | .NET 10 运行时（只为 Hub；不装 Hub 时客户端/服务端仍可加载） |
-| 依赖 | 无（不需要 Fika、不需要 BigBrain） |
-| 协议 | MIT |
-| 仓库 | https://github.com/65tiankehan/SENTINEL-LINK |
+| 打开好友列表 | 在原生 `GetFriendList` 返回值尾部追加，不写 `FriendProfileIds` |
+| 打开对话列表 | 在 `GenerateDialogueList` 尾部追加虚拟会话 |
+| 打开某个对话 | `GenerateDialogueView` 前缀拦截虚拟 id，自己造返回值 |
+| 发一条消息 | `SendMessage` 前缀把虚拟 id 的消息转给 Hub |
+| 虚拟 id | `sha256(...)` 前 20 位 + 域标记 `1e0f`，与真实 id 不可能撞 |
 
-## 上传文件
+**存档安全**：所有注入都走返回值，不写 `DialogueRecords`；每次保存前比对对话条数，一旦变少立刻记 `profile-drop.log`。仓库里有 `文档/P2a-注入清单.md` 写了完整判定。
 
-优先用安装器（推荐给玩家）：
+## 安装
 
-- `SENTINEL-LINK-Setup.exe` — 3,121,152 B
-  sha256 `93852192F97CCDE92FA100E603D6D5AA61DFA274BAE9857ABD8F1A5C9556670D`
+1. 下载 `SENTINEL-LINK-Setup.exe`，选游戏根目录（含 `EscapeFromTarkov.exe` 那层）
+2. 装完重启游戏，主菜单底栏「消息」里就有好友和频道
+3. 要联机时先跑 `SENTINEL-Link-Hub\启动 Hub.cmd`（**需要 .NET 10 运行时**）
 
-给要手动装的人用的压缩包：
+手动装也可以，用 `SENTINEL-LINK-0.1.0.zip`：客户端插件丢 `BepInEx\plugins\`，服务端模组丢 `SPT_Runtime\user\mods\`，Hub 丢游戏根。
 
-- `SENTINEL-LINK-0.1.0.zip` — 189,187 B
-  sha256 `C06CD24A928902A21D764E6430B92C805EEE28DBDC9667718A89E390FBA87AFA`
-  内含 `BepInEx/plugins/SENTINEL.Link/`、`SPT_Runtime/user/mods/cn.passionyang.sentinellink.server/`、`SENTINEL-Link-Hub/`，以及 `LICENSE` / `README.md` / `Hub-协议.md`
+## 已知限制
 
-> 安装器与 zip 的载荷完全一致（同一份 `payload.zip`，178,250 B / 12 个条目，内嵌校验逐字节相同）。
+- Hub 是**单点**：自己开服的人要自己跑 Hub，别人连你得能访问到
+- 频道成员按 realm 划分，跨 realm 不互通（配置里 `realm` 一致才看得见）
+- 跨服跳蚤报价（P3）、局内空投（P4）、组队（P5）还没做
+- 原生好友列表的「计数」会把三个频道也算进去（显示 5 实际 6 行）
 
-## 正文
+## 许可
 
-直接用 `docs/发布稿-Link-0.1.0.md` 的全文（145 行 / 7,435 B）。要点顺序：不是什么 → 装完多出什么 → 怎么接进去的 → 安装三步 → 不做什么 → 已知限制 → 下载与 sha256 → 更新日志 → 开源仓库。
+MIT。协议文档在仓库 `docs/Hub-协议.md`，二次开发请保持帧契约只增字段、虚拟 id 派生规则不变。
+```
 
-## 变更日志（0.1.0）
+## License
 
-- 跨服好友注入原生好友列表，点开即私聊
-- 私聊落盘队列：离线 500 条 / 168 小时，上线按序补投（100 条对账 0 丢失）
-- 世界 / 交易 / 求组 三个公共频道，长在原生聊天窗（Hub 每频道留最近 100 条）
-- F11 面板：局内外可用，打开时锁人物输入，`Ctrl+V` 粘中文
-- Hub 协议冻结 v1（`docs/Hub-协议.md`：帧目录、边界、id 派生规则、扩展流程）
-- 存档哨兵：每次保存前比对对话条数，变少立刻记 `profile-drop.log`
+选 **MIT**。
 
-## 上传前检查清单
+## Category
 
-- [ ] 游戏关掉再测安装器（BepInEx 只在启动加载）
-- [ ] 装完进主菜单，底栏「消息」能看到 `世界 / 交易 / 求组` 与在线对端
-- [ ] 起 `SENTINEL-Link-Hub\启动 Hub.cmd`，Hub 控制台打印监听 `127.0.0.1:5180`
-- [ ] 发一条世界消息，原生窗里能看到自己和别人的回显
-- [ ] 卸载一次，确认 `BepInEx\config\cn.passionyang.sentinellink.client.cfg` 与 profile 都还在（服务端 `config.json` 保留）
+选最接近的（一般是 `Utility` / `Tools` / `Other`，看 Forge 的选项）——我们不属于 gameplay 改动。
+
+## Additional Authors
+
+留空。
+
+## Source Code Links
+
+```
+https://github.com/65tiankehan/SENTINEL-LINK
+```
+
+Label 填 `GitHub`。
+
+## Publish Date
+
+留空（先建好，检查页面无误再点发布）；想立刻上架就点 `Now`。
+
+## General Disclosure
+
+- **Contains Ads**：不勾
+- **Show Cheat Warning**：**不勾**（本模组不含作弊功能：无 ESP、无透视、无改属性；好友/聊天/UI）
+
+## Comments
+
+勾上 **Enable Comments**（要收反馈）。
+
+## Issues
+
+勾上 **Enable Issues**（Forge 提示「in beta」，但用户报 bug 好用）。
+
+## Comment Version Tags
+
+保持默认（Red / Amber / Amber）。
+
+## Add-ons
+
+**不勾** `Disable Add-ons`（留默认，允许别人做附属）。
+
+## Mod Lists
+
+**不勾** `Disable Mod Lists`。
+
+## Notifications
+
+勾上 `Subscribe to Comment Notifications`。
+
+---
+
+## 下载资产（两处 sha256 一致）
+
+| 文件 | 字节 | sha256 |
+| --- | --- | --- |
+| `SENTINEL-LINK-Setup.exe` | 3,121,664 | `3F86D78CD07968DEEAA322E6DE81EC1488EB9A73643579D5BA513AB2A77D15CF` |
+| `SENTINEL-LINK-0.1.0.zip` | 189,892 | `252FC8AA0C87A7F467D892E296BC54DF558166CB98980C76BE5DD670C5D13634` |
+
+## 提示
+
+Forge 会从 `SPT_Runtime/user/mods/<guid>/package.json` 读版本与 GUID 做兼容表与更新检查。我们的 `package.json` 已把 `license` 从 `Proprietary` 改成 `MIT` 与仓库一致——如果你已经上传过旧包，记得换成新包再传。
