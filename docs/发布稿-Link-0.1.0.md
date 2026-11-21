@@ -130,9 +130,16 @@ sha256 `93852192F97CCDE92FA100E603D6D5AA61DFA274BAE9857ABD8F1A5C9556670D`
 - Hub 协议冻结 v1（帧目录、边界、id 派生规则都在仓库 `docs/Hub-协议.md`）
 - 存档哨兵：每次保存前对比对话条数，一旦变少立刻记 `profile-drop.log`
 
-## 仓库
+## 开源 / 仓库
 
-Hub / 服务端 / 客户端 / 工具四块，MIT。（第一个版本刚打完，仓库地址回帖里补，先发安装包。）
-文档里会放：`Hub-协议.md`（想自己写个客户端的话看这个）、`P2a-注入清单.md`（四个注入点与不脏写判定）、`Link-进度.md`（做到哪一步了）
+**https://github.com/65tiankehan/SENTINEL-LINK** —— MIT，四块代码都在里面：Hub（net10）、服务端模组（net10）、客户端插件（net48）、工具（假对端 / 诊断）。
+
+想自己写个客户端、或者把 LINK 接进别的壳子，看这几份：
+
+- `docs/Hub-协议.md` —— 帧契约（只增字段不删、未知帧忽略），`hello / welcome / presence / chat / ack / dm / dm-sync / world / world-sync / ping` 全在里面
+- `docs/P2a-注入清单.md` —— 四个注入点与「不脏写」判定，照这个顺序接不会写坏存档
+- `docs/Link-进度.md` —— 做到哪一步、哪些还没验，都在明面上
+
+装包也可以直接下 release 里的 `SENTINEL-LINK-Setup.exe`（和这里给的是同一个文件，sha256 一致）。
 
 有 bug、有想法，回帖或者 issue 都行。

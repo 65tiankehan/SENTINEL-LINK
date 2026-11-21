@@ -5,6 +5,7 @@ SPT 4.1.6 的**联机 + 社交**套件。对外名 **SENTINEL Link**，技术身
 对手是 NekoParty / NekoNET（研究笔记：[docs/neko-研究.md](docs/neko-研究.md)）。
 我们的差异点：**单人也能用的社交层，联机是加法不是前提** —— 不需要 Fika、不需要玩家开端口、不改渲染。
 
+仓库：<https://github.com/65tiankehan/SENTINEL-LINK> · 协议：**MIT**（见 [LICENSE](LICENSE)）
 路线与判据见 [docs/SENTINEL-Link-计划书.md](docs/SENTINEL-Link-计划书.md)，帧规范见 [docs/Hub-协议.md](docs/Hub-协议.md)，改动记录见 [docs/Link-进度.md](docs/Link-进度.md)。
 
 ## 当前状态（2026-11-21）
@@ -111,3 +112,14 @@ copy Client\bin\Release\SENTINEL.Link.Client.dll E:\EFT-Fika\BepInEx\plugins\SEN
 pwsh -File installer\scripts\build-payload.ps1 -SptClientDir "E:\EFT"
 cd installer\src-tauri; cargo build --release --offline
 ```
+
+## 开源与发布
+
+- 仓库：<https://github.com/65tiankehan/SENTINEL-LINK>（MIT，欢迎 issue / PR）
+- 安装包：本仓库 release 的 `SENTINEL-LINK-Setup.exe`；sp-mod 页面同步上传同一份 zip
+- 三个组件可单独取用：只想连别人的 Hub 就只装客户端插件；自己做 Hub 起 `Hub/`；只写服务端逻辑看 `Server/Services/LinkFriends.cs` 与 `Patches/DialoguePatches.cs`
+- 二次开发请注意：`docs/Hub-协议.md` 是帧契约（只增字段不删、未知帧忽略），改协议要同步升版本；虚拟 id 必须保持 `sha256 前 20 位 + 1e0f` 的派生规则，否则会和别人的实现撞车
+
+## 许可证
+
+MIT。用、改、商用都行，保留版权声明即可。游戏资产（EFT / SPT 本体）不在本仓库内，遵循各自的许可。

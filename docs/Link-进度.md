@@ -468,3 +468,17 @@ dotnet D:\sptEdior\SENTINELLink\Tools\SyntheticPeer\bin\Release\net10.0\Syntheti
 发布稿里的数字全部现查核对：安装器 **3,121,152 B**、sha256 `93852192F97CCDE92FA100E603D6D5AA61DFA274BAE9857ABD8F1A5C9556670D`；载荷 **178,250 B / 12 条目**；内嵌 zip 与 `payload.zip` 逐字节一致（EOCD 反推起点 `0x22D744`）。
 
 > 还没做的两件：`link-0.1.0` 的 git tag + release 附件；仓库推远端（本地仓库目前**无 remote**，发布稿里写的是「地址回帖里补」）。
+
+## 2026-11-21 · 开源准备（MIT + sp-mod）
+
+| 项 | 值 |
+| --- | --- |
+| 仓库 | `https://github.com/65tiankehan/SENTINEL-LINK`（local remote 已设为 origin） |
+| 协议 | `LICENSE`（MIT，Copyright 2026 65tiankehan (passionYang)），1,081 B |
+| README | 125 行 / 7,195 B：头部补「仓库 + MIT」，末尾补「开源与发布」「许可证」两节 |
+| 发布稿 | 145 行 / 7,435 B：仓库段换成真实地址 + 三份契约文档指引 |
+| sp-mod 素材 | `docs/sp-mod-上传信息.md`：标题/标签/兼容表/两个文件的 sha256/变更日志/上传前检查清单 |
+| 发布包 | `installer/dist/SENTINEL-LINK-0.1.0.zip` **189,187 B**，sha256 `C06CD24A928902A21D764E6430B92C805EEE28DBDC9667718A89E390FBA87AFA`（载荷 + LICENSE + README + Hub-协议） |
+
+- 二次开发的护栏写进 README 了：帧契约只增字段不删、虚拟 id 必须保持 `sha256 前 20 位 + 1e0f`，否则会和别人的实现撞车。
+- 还没做：`git push -u origin master`（等用户发话）、`link-0.1.0` tag、GitHub release 附件上传（安装器 + zip）。
