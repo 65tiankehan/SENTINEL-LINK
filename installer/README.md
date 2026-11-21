@@ -16,6 +16,13 @@ SENTINEL-Link-Hub/                                  框架依赖的 Hub（双击
 
 服务端模组两种目录都兼容：有 `SPT_Runtime/user/mods` 就装那里，老版 SPT 自动落到 `user/mods`。
 
+## 界面
+
+内置 **中 / 英 / 俄** 三种语言与 **暖金 / 暗黑 / 亮白** 三套主题（与游戏内 F9 菜单同一套 token），右上角两个小胶囊切换，选择记在 WebView 的 localStorage。
+
+调试时可以绕过记忆、直接用 URL 片段强制预览：`ui/index.html#dark`、`ui/index.html#light-ru`（`#主题-语言`）。页面在没有 Tauri 的环境里也能打开（`window.__TAURI__` 为空时用空实现兜底），方便截图与调色。
+
+
 ## 构建
 
 ```powershell
